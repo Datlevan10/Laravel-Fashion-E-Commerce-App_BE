@@ -38,4 +38,14 @@ class CartDetail extends Model
             $cart_detail->cart_detail_id = Str::random(8);
         });
     }
+
+    public function product()
+    {
+        return $this->belongsTo(\App\Models\Product::class, 'product_id', 'product_id');
+    }
+
+    public function cart()
+    {
+        return $this->belongsTo(\App\Models\Cart::class, 'cart_id', 'cart_id');
+    }
 }

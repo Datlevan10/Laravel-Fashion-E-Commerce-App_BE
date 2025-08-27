@@ -12,13 +12,13 @@ class Category extends Model
 
     protected $table = 'categories';
 
-    protected $primaryKey = 'category_id';
+    protected $primaryKey = 'categoryId';
     public $incrementing = false;
     protected $keyType = 'string';
 
     protected $fillable = [
-        'category_name',
-        'image_category',
+        'categoryName',
+        'imageCategory',
         'description',
     ];
 
@@ -27,7 +27,7 @@ class Category extends Model
         parent::boot();
 
         static::creating(function ($category) {
-            $category->category_id = Str::random(8);
+            $category->categoryId = Str::random(8);
         });
     }
 }

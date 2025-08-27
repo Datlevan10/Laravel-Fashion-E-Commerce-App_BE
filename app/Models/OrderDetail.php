@@ -43,6 +43,11 @@ class OrderDetail extends Model
         return $this->belongsTo(Order::class, 'order_id', 'order_id');
     }
 
+    public function product()
+    {
+        return $this->belongsTo(\App\Models\Product::class, 'product_id', 'product_id');
+    }
+
     public function show($id)
     {
         $orderDetail = OrderDetail::with('order.customer', 'order.staff')->findOrFail($id);

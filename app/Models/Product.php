@@ -47,7 +47,7 @@ class Product extends Model
 
         static::created(function ($product) {
             $storeName = DB::table('stores')->value('store_name') ?? 'Default Store';
-            $categoryName = $product->category->category_name ?? null;
+            $categoryName = $product->category->categoryName ?? null;
 
             DB::table('notifications')->insert([
                 'notification_id' => Str::random(8),
@@ -63,12 +63,17 @@ class Product extends Model
 
     public function category()
     {
-        return $this->belongsTo(Category::class, 'category_id', 'category_id');
+        return $this->belongsTo(Category::class, 'category_id', 'categoryId');
     }
 
     public function store()
     {
         return $this->belongsTo(Store::class, 'store_id', 'store_id');
+    }
+
+    public function orderDetails()
+    {
+        return $this->hasMany(\App\Models\OrderDetail::class, 'product_id', 'product_id');
     }
 
 }

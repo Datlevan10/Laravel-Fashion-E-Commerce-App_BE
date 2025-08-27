@@ -429,7 +429,8 @@ class AdminController extends Controller
     {
         try {
             $totalCategories = \App\Models\Category::count();
-            $activeCategories = \App\Models\Category::where('is_active', 1)->count();
+            // Categories table doesn't have is_active column, so all are considered active
+            $activeCategories = $totalCategories;
 
             return response()->json([
                 'message' => 'Total categories retrieved successfully',
@@ -479,9 +480,13 @@ class AdminController extends Controller
     {
         try {
             $totalProducts = \App\Models\Product::count();
-            $activeProducts = \App\Models\Product::where('is_active', 1)->count();
-            $lowStockProducts = \App\Models\Product::where('quantity', '<', 10)->count();
-            $outOfStockProducts = \App\Models\Product::where('quantity', '<=', 0)->count();
+            // Products table doesn't have is_active or quantity columns
+            $activeProducts = $totalProducts; // All products are considered active
+            
+            // Calculate stock info from cart_details and order_details if needed
+            // For now, we'll return 0 for stock-related metrics since quantity isn't tracked in products table
+            $lowStockProducts = 0;
+            $outOfStockProducts = 0;
 
             return response()->json([
                 'message' => 'Total products retrieved successfully',
@@ -507,8 +512,8 @@ class AdminController extends Controller
     {
         try {
             $totalCarts = \App\Models\Cart::count();
-            $activeCarts = \App\Models\Cart::where('is_ordered', false)->count();
-            $abandonedCarts = \App\Models\Cart::where('is_ordered', false)
+            $activeCarts = \App\Models\Cart::where('cart_status', false)->count();
+            $abandonedCarts = \App\Models\Cart::where('cart_status', false)
                 ->where('updated_at', '<', now()->subHours(24))
                 ->count();
 
@@ -535,13 +540,11 @@ class AdminController extends Controller
     {
         try {
             $activeCarts = \App\Models\Cart::with(['customer', 'cartDetails.product'])
-                ->where('is_ordered', false)
+                ->where('cart_status', false)
                 ->get();
 
             $totalValue = $activeCarts->sum(function ($cart) {
-                return $cart->cartDetails->sum(function ($detail) {
-                    return $detail->quantity * $detail->product->price;
-                });
+                return $cart->cartDetails->sum('total_price');
             });
 
             return response()->json([
@@ -558,9 +561,7 @@ class AdminController extends Controller
                                 'email' => $cart->customer->email
                             ],
                             'items_count' => $cart->cartDetails->count(),
-                            'total_value' => $cart->cartDetails->sum(function ($detail) {
-                                return $detail->quantity * $detail->product->price;
-                            }),
+                            'total_value' => $cart->cartDetails->sum('total_price'),
                             'updated_at' => $cart->updated_at
                         ];
                     })
@@ -581,16 +582,16 @@ class AdminController extends Controller
     {
         try {
             $totalOrders = \App\Models\Order::count();
-            $totalRevenue = \App\Models\Order::sum('total_amount');
+            $totalRevenue = \App\Models\Order::sum('total_price');
             
             $todayOrders = \App\Models\Order::whereDate('created_at', today())->count();
-            $todayRevenue = \App\Models\Order::whereDate('created_at', today())->sum('total_amount');
+            $todayRevenue = \App\Models\Order::whereDate('created_at', today())->sum('total_price');
             
             $weeklyOrders = \App\Models\Order::whereBetween('created_at', [now()->startOfWeek(), now()->endOfWeek()])->count();
-            $weeklyRevenue = \App\Models\Order::whereBetween('created_at', [now()->startOfWeek(), now()->endOfWeek()])->sum('total_amount');
+            $weeklyRevenue = \App\Models\Order::whereBetween('created_at', [now()->startOfWeek(), now()->endOfWeek()])->sum('total_price');
             
             $monthlyOrders = \App\Models\Order::whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])->count();
-            $monthlyRevenue = \App\Models\Order::whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])->sum('total_amount');
+            $monthlyRevenue = \App\Models\Order::whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])->sum('total_price');
 
             $pendingOrders = \App\Models\Order::where('order_status', 'pending')->count();
             $confirmedOrders = \App\Models\Order::where('order_status', 'confirmed')->count();
@@ -657,7 +658,7 @@ class AdminController extends Controller
                             'full_name' => $order->customer->full_name,
                             'email' => $order->customer->email
                         ],
-                        'total_amount' => $order->total_amount,
+                        'total_amount' => $order->total_price,
                         'order_status' => $order->order_status,
                         'items_count' => $order->orderDetails->count(),
                         'created_at' => $order->created_at,
@@ -691,7 +692,7 @@ class AdminController extends Controller
                     $query->whereHas('order', function ($orderQuery) {
                         $orderQuery->where('order_status', '!=', 'cancelled');
                     });
-                }], DB::raw('quantity * price'))
+                }], DB::raw('quantity * unit_price'))
                 ->orderBy('total_sold', 'desc')
                 ->limit($limit)
                 ->get();
@@ -702,11 +703,11 @@ class AdminController extends Controller
                     return [
                         'product_id' => $product->product_id,
                         'product_name' => $product->product_name,
-                        'price' => $product->price,
-                        'quantity' => $product->quantity,
+                        'price' => $product->new_price,
+                        'old_price' => $product->old_price,
                         'total_sold' => $product->total_sold ?? 0,
                         'total_revenue' => $product->total_revenue ?? 0,
-                        'category' => $product->category ? $product->category->category_name : null,
+                        'category' => $product->category ? $product->category->categoryName : null,
                         'image' => $product->image ? (is_array($product->image) && isset($product->image[0]) ? $product->image[0] : $product->image) : null
                     ];
                 })
