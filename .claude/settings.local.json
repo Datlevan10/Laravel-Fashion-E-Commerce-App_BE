@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm:*)",
+      "Bash(npm install)",
+      "Bash(npm install:*)",
+      "Bash(npx expo:*)",
+      "Bash(npm cache clean:*)",
+      "Bash(npm run ios:*)",
+      "Bash(find:*)",
+      "Bash(git add:*)",
+      "Bash(git rebase:*)",
+      "Bash(grep:*)"
+    ],
+    "deny": []
+  }
+}

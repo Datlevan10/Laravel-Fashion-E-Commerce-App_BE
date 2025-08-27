@@ -114,7 +114,10 @@ class ProductController extends Controller
         $imagePaths = [];
         if ($request->hasFile('image')) {
             foreach ($request->file('image') as $image) {
-                $imageName = time() . '_' . $image->getClientOriginalName();
+                $originalName = $image->getClientOriginalName();
+                // Sanitize filename: replace spaces and special characters
+                $safeName = preg_replace('/[^a-zA-Z0-9._-]/', '_', $originalName);
+                $imageName = time() . '_' . $safeName;
                 $imagePath = $image->storeAs('products', $imageName, 'public');
                 $imagePaths[] = Storage::url($imagePath);
             }
@@ -204,7 +207,10 @@ class ProductController extends Controller
         if ($request->hasFile('image')) {
             $imagePaths = [];
             foreach ($request->file('image') as $image) {
-                $imageName = time() . '_' . $image->getClientOriginalName();
+                $originalName = $image->getClientOriginalName();
+                // Sanitize filename: replace spaces and special characters
+                $safeName = preg_replace('/[^a-zA-Z0-9._-]/', '_', $originalName);
+                $imageName = time() . '_' . $safeName;
                 $imagePath = $image->storeAs('products', $imageName, 'public');
                 $imagePaths[] = Storage::url($imagePath);
             }

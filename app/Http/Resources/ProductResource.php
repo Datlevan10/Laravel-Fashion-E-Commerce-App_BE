@@ -22,7 +22,7 @@ class ProductResource extends JsonResource
             'description' => $this->description,
             'color' => $this->color,
             'size' => $this->size,
-            'image' => $this->image,
+            'image' => $this->formatImageUrls($this->image),
             'old_price' => $this->old_price,
             'new_price' => $this->new_price,
             'total_review' => $this->total_review,
@@ -31,5 +31,27 @@ class ProductResource extends JsonResource
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];
+    }
+
+    /**
+     * Format image URLs to ensure they are properly accessible
+     */
+    private function formatImageUrls($images)
+    {
+        if (!$images || !is_array($images)) {
+            return $images;
+        }
+
+        return array_map(function ($image) {
+            if (is_array($image) && isset($image['url'])) {
+                // Ensure the URL starts with /storage and is properly formatted
+                $url = $image['url'];
+                if (!str_starts_with($url, '/storage/')) {
+                    $url = '/storage/' . ltrim($url, '/');
+                }
+                return ['url' => $url];
+            }
+            return $image;
+        }, $images);
     }
 }
