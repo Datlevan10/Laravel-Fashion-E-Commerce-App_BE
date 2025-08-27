@@ -62,6 +62,9 @@ Route::prefix('')->group(function () {
 
     // User Management Routes (Admin, Staff, Customer)
     Route::apiResource('admins', AdminController::class);
+    Route::middleware('api')->post('admins/auth/login', [AdminController::class, 'authenticateLoginAdmin']);
+    Route::middleware('auth:sanctum')->post('admins/auth/logout', [AdminController::class, 'logout']);
+    Route::post('admins/auth/refresh-token', [AdminController::class, 'refreshAccessToken']);
     Route::apiResource('staffs', StaffController::class);
     Route::apiResource('customers', CustomerController::class);
     Route::middleware('api')->post('customers/auth/login', [CustomerController::class, 'authenticateLoginCustomer']);
