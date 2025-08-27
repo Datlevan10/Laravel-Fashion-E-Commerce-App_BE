@@ -66,6 +66,10 @@ Route::prefix('')->group(function () {
     Route::middleware('auth:sanctum')->post('admins/auth/logout', [AdminController::class, 'logout']);
     Route::post('admins/auth/refresh-token', [AdminController::class, 'refreshAccessToken']);
     Route::apiResource('staffs', StaffController::class);
+    Route::middleware('api')->post('staffs/auth/login', [StaffController::class, 'authenticateLoginStaff']);
+    Route::middleware('auth:sanctum')->post('staffs/auth/logout', [StaffController::class, 'logout']);
+    Route::post('staffs/auth/refresh-token', [StaffController::class, 'refreshAccessToken']);
+    
     Route::apiResource('customers', CustomerController::class);
     Route::middleware('api')->post('customers/auth/login', [CustomerController::class, 'authenticateLoginCustomer']);
     Route::middleware('auth:sanctum')->post('customers/auth/logout', [CustomerController::class, 'logout']);

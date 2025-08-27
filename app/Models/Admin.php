@@ -3,12 +3,14 @@
 namespace App\Models;
 
 use Illuminate\Support\Str;
-use Illuminate\Database\Eloquent\Model;
+use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Notifications\Notifiable;
+use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
-class Admin extends Model
+class Admin extends Authenticatable
 {
-    use HasFactory;
+    use HasFactory, HasApiTokens, Notifiable;
 
     protected $table = 'admins';
 
@@ -42,7 +44,7 @@ class Admin extends Model
     }
     public function updateLastLogin()
     {
-        $this->lasLogin = now();
+        $this->last_login = now();
         $this->save();
     }
 }

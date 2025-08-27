@@ -312,7 +312,7 @@ class StaffController extends Controller
             ], 401);
         }
 
-        if (!$staff->is_active) {
+        if ($staff->is_active === false) {
             return response()->json([
                 'message' => 'Staff account is deactivated',
                 'error_code' => 'ACCOUNT_DEACTIVATED',
@@ -399,7 +399,7 @@ class StaffController extends Controller
         }
 
         $staff = Staff::find($tokenRecord->staff_id);
-        if (!$staff || !$staff->is_active) {
+        if (!$staff || $staff->is_active === false) {
             return response()->json([
                 'message' => 'Staff not found or deactivated.',
             ], 404);

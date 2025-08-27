@@ -273,7 +273,7 @@ class AdminController extends Controller
             ], 401);
         }
 
-        if (!$admin->is_active) {
+        if ($admin->is_active === false) {
             return response()->json([
                 'message' => 'Admin account is deactivated',
                 'error_code' => 'ACCOUNT_DEACTIVATED',
@@ -283,7 +283,18 @@ class AdminController extends Controller
         $admin->last_login = now();
         $admin->save();
 
-        $accessToken = $admin->createToken('admin-access-token', ['*'], now()->addMinutes(120))->plainTextToken;
+        try {
+            $accessToken = $admin->createToken('admin-access-token', ['*'], now()->addMinutes(120))->plainTextToken;
+        } catch (\Exception $e) {
+            \Log::error('Admin login token creation failed', [
+                'admin_id' => $admin->admin_id,
+                'error' => $e->getMessage()
+            ]);
+            return response()->json([
+                'message' => 'Authentication failed',
+                'error' => 'Token creation failed'
+            ], 500);
+        }
 
         $refreshToken = Str::random(64);
         $expiresAt = now()->addDays(30);
@@ -360,7 +371,7 @@ class AdminController extends Controller
         }
 
         $admin = Admin::find($tokenRecord->admin_id);
-        if (!$admin || !$admin->is_active) {
+        if (!$admin || $admin->is_active === false) {
             return response()->json([
                 'message' => 'Admin not found or deactivated.',
             ], 404);
