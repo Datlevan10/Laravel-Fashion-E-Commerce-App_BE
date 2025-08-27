@@ -12,7 +12,8 @@
       "Bash(git rebase:*)",
       "Bash(grep:*)",
       "Bash(rm:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(php:*)"
     ],
     "deny": []
   }
