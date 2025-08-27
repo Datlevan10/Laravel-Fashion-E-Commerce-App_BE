@@ -13,7 +13,13 @@
       "Bash(grep:*)",
       "Bash(rm:*)",
       "Bash(cat:*)",
-      "Bash(php:*)"
+      "Bash(php:*)",
+      "Bash(./artisan migrate)",
+      "Bash(chmod:*)",
+      "Bash(apt list:*)",
+      "Bash(docker:*)",
+      "Bash(composer --version)",
+      "Bash(rg:*)"
     ],
     "deny": []
   }

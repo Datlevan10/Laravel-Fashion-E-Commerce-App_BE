@@ -273,7 +273,7 @@ class AdminController extends Controller
             ], 401);
         }
 
-        if ($admin->is_active === false) {
+        if ($admin->is_active === false || $admin->is_active === 0) {
             return response()->json([
                 'message' => 'Admin account is deactivated',
                 'error_code' => 'ACCOUNT_DEACTIVATED',
@@ -371,7 +371,7 @@ class AdminController extends Controller
         }
 
         $admin = Admin::find($tokenRecord->admin_id);
-        if (!$admin || $admin->is_active === false) {
+        if (!$admin || $admin->is_active === false || $admin->is_active === 0) {
             return response()->json([
                 'message' => 'Admin not found or deactivated.',
             ], 404);

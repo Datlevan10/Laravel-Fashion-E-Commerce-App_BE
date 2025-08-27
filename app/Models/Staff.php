@@ -46,7 +46,7 @@ class Staff extends Authenticatable
     }
     public function updateLastLogin()
     {
-        $this->lasLogin = now();
+        $this->last_login = now();
         $this->save();
     }
 }
