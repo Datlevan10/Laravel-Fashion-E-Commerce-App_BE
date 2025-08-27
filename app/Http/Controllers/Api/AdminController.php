@@ -397,4 +397,328 @@ class AdminController extends Controller
             'expires_in' => 7200,
         ], 200);
     }
+
+    // Dashboard Statistics Methods
+    public function getTotalCustomers()
+    {
+        try {
+            $totalCustomers = \App\Models\Customer::count();
+            $activeCustomers = \App\Models\Customer::where('is_active', 1)->count();
+            $inactiveCustomers = \App\Models\Customer::where('is_active', 0)->count();
+
+            return response()->json([
+                'message' => 'Total customers retrieved successfully',
+                'data' => [
+                    'total' => $totalCustomers,
+                    'active' => $activeCustomers,
+                    'inactive' => $inactiveCustomers
+                ]
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('Failed to get total customers', [
+                'error' => $e->getMessage()
+            ]);
+            return response()->json([
+                'message' => 'Failed to retrieve customer statistics',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function getTotalCategories()
+    {
+        try {
+            $totalCategories = \App\Models\Category::count();
+            $activeCategories = \App\Models\Category::where('is_active', 1)->count();
+
+            return response()->json([
+                'message' => 'Total categories retrieved successfully',
+                'data' => [
+                    'total' => $totalCategories,
+                    'active' => $activeCategories
+                ]
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('Failed to get total categories', [
+                'error' => $e->getMessage()
+            ]);
+            return response()->json([
+                'message' => 'Failed to retrieve category statistics',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function getTotalStaff()
+    {
+        try {
+            $totalStaff = \App\Models\Staff::count();
+            $activeStaff = \App\Models\Staff::where('is_active', 1)->count();
+            $inactiveStaff = \App\Models\Staff::where('is_active', 0)->count();
+
+            return response()->json([
+                'message' => 'Total staff retrieved successfully',
+                'data' => [
+                    'total' => $totalStaff,
+                    'active' => $activeStaff,
+                    'inactive' => $inactiveStaff
+                ]
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('Failed to get total staff', [
+                'error' => $e->getMessage()
+            ]);
+            return response()->json([
+                'message' => 'Failed to retrieve staff statistics',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function getTotalProducts()
+    {
+        try {
+            $totalProducts = \App\Models\Product::count();
+            $activeProducts = \App\Models\Product::where('is_active', 1)->count();
+            $lowStockProducts = \App\Models\Product::where('quantity', '<', 10)->count();
+            $outOfStockProducts = \App\Models\Product::where('quantity', '<=', 0)->count();
+
+            return response()->json([
+                'message' => 'Total products retrieved successfully',
+                'data' => [
+                    'total' => $totalProducts,
+                    'active' => $activeProducts,
+                    'low_stock' => $lowStockProducts,
+                    'out_of_stock' => $outOfStockProducts
+                ]
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('Failed to get total products', [
+                'error' => $e->getMessage()
+            ]);
+            return response()->json([
+                'message' => 'Failed to retrieve product statistics',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function getTotalCarts()
+    {
+        try {
+            $totalCarts = \App\Models\Cart::count();
+            $activeCarts = \App\Models\Cart::where('is_ordered', false)->count();
+            $abandonedCarts = \App\Models\Cart::where('is_ordered', false)
+                ->where('updated_at', '<', now()->subHours(24))
+                ->count();
+
+            return response()->json([
+                'message' => 'Total carts retrieved successfully',
+                'data' => [
+                    'total' => $totalCarts,
+                    'active' => $activeCarts,
+                    'abandoned' => $abandonedCarts
+                ]
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('Failed to get total carts', [
+                'error' => $e->getMessage()
+            ]);
+            return response()->json([
+                'message' => 'Failed to retrieve cart statistics',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function getActiveCarts()
+    {
+        try {
+            $activeCarts = \App\Models\Cart::with(['customer', 'cartDetails.product'])
+                ->where('is_ordered', false)
+                ->get();
+
+            $totalValue = $activeCarts->sum(function ($cart) {
+                return $cart->cartDetails->sum(function ($detail) {
+                    return $detail->quantity * $detail->product->price;
+                });
+            });
+
+            return response()->json([
+                'message' => 'Active carts retrieved successfully',
+                'data' => [
+                    'count' => $activeCarts->count(),
+                    'total_value' => $totalValue,
+                    'carts' => $activeCarts->map(function ($cart) {
+                        return [
+                            'cart_id' => $cart->cart_id,
+                            'customer' => [
+                                'customer_id' => $cart->customer->customer_id,
+                                'full_name' => $cart->customer->full_name,
+                                'email' => $cart->customer->email
+                            ],
+                            'items_count' => $cart->cartDetails->count(),
+                            'total_value' => $cart->cartDetails->sum(function ($detail) {
+                                return $detail->quantity * $detail->product->price;
+                            }),
+                            'updated_at' => $cart->updated_at
+                        ];
+                    })
+                ]
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('Failed to get active carts', [
+                'error' => $e->getMessage()
+            ]);
+            return response()->json([
+                'message' => 'Failed to retrieve active carts',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function getOrdersStatistics()
+    {
+        try {
+            $totalOrders = \App\Models\Order::count();
+            $totalRevenue = \App\Models\Order::sum('total_amount');
+            
+            $todayOrders = \App\Models\Order::whereDate('created_at', today())->count();
+            $todayRevenue = \App\Models\Order::whereDate('created_at', today())->sum('total_amount');
+            
+            $weeklyOrders = \App\Models\Order::whereBetween('created_at', [now()->startOfWeek(), now()->endOfWeek()])->count();
+            $weeklyRevenue = \App\Models\Order::whereBetween('created_at', [now()->startOfWeek(), now()->endOfWeek()])->sum('total_amount');
+            
+            $monthlyOrders = \App\Models\Order::whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])->count();
+            $monthlyRevenue = \App\Models\Order::whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])->sum('total_amount');
+
+            $pendingOrders = \App\Models\Order::where('order_status', 'pending')->count();
+            $confirmedOrders = \App\Models\Order::where('order_status', 'confirmed')->count();
+            $shippedOrders = \App\Models\Order::where('order_status', 'shipped')->count();
+            $deliveredOrders = \App\Models\Order::where('order_status', 'delivered')->count();
+            $cancelledOrders = \App\Models\Order::where('order_status', 'cancelled')->count();
+
+            return response()->json([
+                'message' => 'Order statistics retrieved successfully',
+                'data' => [
+                    'total' => [
+                        'orders' => $totalOrders,
+                        'revenue' => $totalRevenue
+                    ],
+                    'today' => [
+                        'orders' => $todayOrders,
+                        'revenue' => $todayRevenue
+                    ],
+                    'weekly' => [
+                        'orders' => $weeklyOrders,
+                        'revenue' => $weeklyRevenue
+                    ],
+                    'monthly' => [
+                        'orders' => $monthlyOrders,
+                        'revenue' => $monthlyRevenue
+                    ],
+                    'by_status' => [
+                        'pending' => $pendingOrders,
+                        'confirmed' => $confirmedOrders,
+                        'shipped' => $shippedOrders,
+                        'delivered' => $deliveredOrders,
+                        'cancelled' => $cancelledOrders
+                    ]
+                ]
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('Failed to get order statistics', [
+                'error' => $e->getMessage()
+            ]);
+            return response()->json([
+                'message' => 'Failed to retrieve order statistics',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function getRecentOrders(Request $request)
+    {
+        try {
+            $limit = $request->get('limit', 10);
+            
+            $recentOrders = \App\Models\Order::with(['customer', 'orderDetails'])
+                ->orderBy('created_at', 'desc')
+                ->limit($limit)
+                ->get();
+
+            return response()->json([
+                'message' => 'Recent orders retrieved successfully',
+                'data' => $recentOrders->map(function ($order) {
+                    return [
+                        'order_id' => $order->order_id,
+                        'customer' => [
+                            'customer_id' => $order->customer->customer_id,
+                            'full_name' => $order->customer->full_name,
+                            'email' => $order->customer->email
+                        ],
+                        'total_amount' => $order->total_amount,
+                        'order_status' => $order->order_status,
+                        'items_count' => $order->orderDetails->count(),
+                        'created_at' => $order->created_at,
+                        'updated_at' => $order->updated_at
+                    ];
+                })
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('Failed to get recent orders', [
+                'error' => $e->getMessage()
+            ]);
+            return response()->json([
+                'message' => 'Failed to retrieve recent orders',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function getTopSellingProducts(Request $request)
+    {
+        try {
+            $limit = $request->get('limit', 5);
+            
+            $topProducts = \App\Models\Product::with(['category'])
+                ->withSum(['orderDetails as total_sold' => function ($query) {
+                    $query->whereHas('order', function ($orderQuery) {
+                        $orderQuery->where('order_status', '!=', 'cancelled');
+                    });
+                }], 'quantity')
+                ->withSum(['orderDetails as total_revenue' => function ($query) {
+                    $query->whereHas('order', function ($orderQuery) {
+                        $orderQuery->where('order_status', '!=', 'cancelled');
+                    });
+                }], DB::raw('quantity * price'))
+                ->orderBy('total_sold', 'desc')
+                ->limit($limit)
+                ->get();
+
+            return response()->json([
+                'message' => 'Top selling products retrieved successfully',
+                'data' => $topProducts->map(function ($product) {
+                    return [
+                        'product_id' => $product->product_id,
+                        'product_name' => $product->product_name,
+                        'price' => $product->price,
+                        'quantity' => $product->quantity,
+                        'total_sold' => $product->total_sold ?? 0,
+                        'total_revenue' => $product->total_revenue ?? 0,
+                        'category' => $product->category ? $product->category->category_name : null,
+                        'image' => $product->image ? (is_array($product->image) && isset($product->image[0]) ? $product->image[0] : $product->image) : null
+                    ];
+                })
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('Failed to get top selling products', [
+                'error' => $e->getMessage()
+            ]);
+            return response()->json([
+                'message' => 'Failed to retrieve top selling products',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 }

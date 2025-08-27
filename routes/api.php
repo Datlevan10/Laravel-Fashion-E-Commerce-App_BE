@@ -184,6 +184,22 @@ Route::prefix('')->group(function () {
     });
     Route::apiResource('customer-statistics', CustomerStatisticController::class);
 
+    // Admin Dashboard Routes
+    Route::prefix('admin/dashboard')->group(function () {
+        Route::get('/customers/total', [AdminController::class, 'getTotalCustomers']);
+        Route::get('/categories/total', [AdminController::class, 'getTotalCategories']);
+        Route::get('/staff/total', [AdminController::class, 'getTotalStaff']);
+        Route::get('/products/total', [AdminController::class, 'getTotalProducts']);
+        Route::get('/carts/total', [AdminController::class, 'getTotalCarts']);
+        Route::get('/carts/active', [AdminController::class, 'getActiveCarts']);
+        Route::get('/orders/statistics', [AdminController::class, 'getOrdersStatistics']);
+    });
+
+    Route::prefix('admin')->group(function () {
+        Route::get('/orders/recent', [AdminController::class, 'getRecentOrders']);
+        Route::get('/products/top-selling', [AdminController::class, 'getTopSellingProducts']);
+    });
+
     // Authenticated User Route
     Route::get('/user', function (Request $request) {
         return $request->user();
