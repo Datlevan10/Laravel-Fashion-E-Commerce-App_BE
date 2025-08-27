@@ -459,4 +459,80 @@ class ProductController extends Controller
             'data' => ProductResource::collection($products),
         ], 200);
     }
+
+    // method GET products by price range
+    public function filterProductsByPrice(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'min_price' => 'nullable|numeric|min:0',
+            'max_price' => 'nullable|numeric|min:0',
+            'sort' => 'nullable|string|in:asc,desc'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Invalid price parameters',
+                'errors' => $validator->messages(),
+            ], 422);
+        }
+
+        $minPrice = $request->input('min_price');
+        $maxPrice = $request->input('max_price');
+        $sort = $request->input('sort', 'asc'); // default to ascending
+
+        // Validate that min_price is not greater than max_price
+        if ($minPrice && $maxPrice && $minPrice > $maxPrice) {
+            return response()->json([
+                'message' => 'Minimum price cannot be greater than maximum price',
+            ], 422);
+        }
+
+        $query = Product::query();
+
+        // Apply price filters
+        if ($minPrice !== null) {
+            $query->where('new_price', '>=', $minPrice);
+        }
+
+        if ($maxPrice !== null) {
+            $query->where('new_price', '<=', $maxPrice);
+        }
+
+        // Apply sorting
+        $query->orderBy('new_price', $sort);
+
+        $products = $query->get();
+
+        if ($products->isEmpty()) {
+            $priceRange = '';
+            if ($minPrice && $maxPrice) {
+                $priceRange = " between {$minPrice} and {$maxPrice}";
+            } elseif ($minPrice) {
+                $priceRange = " above {$minPrice}";
+            } elseif ($maxPrice) {
+                $priceRange = " below {$maxPrice}";
+            }
+
+            return response()->json([
+                'message' => "No products found{$priceRange}",
+                'count' => 0,
+            ], 200);
+        }
+
+        $count = $products->count();
+        
+        $priceRange = '';
+        if ($minPrice && $maxPrice) {
+            $priceRange = " between {$minPrice} and {$maxPrice}";
+        } elseif ($minPrice) {
+            $priceRange = " above {$minPrice}";
+        } elseif ($maxPrice) {
+            $priceRange = " below {$maxPrice}";
+        }
+
+        return response()->json([
+            'message' => "Found {$count} products{$priceRange}, sorted by price ({$sort}ending)",
+            'data' => ProductResource::collection($products),
+        ], 200);
+    }
 }
