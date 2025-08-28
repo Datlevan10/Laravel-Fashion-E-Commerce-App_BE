@@ -111,6 +111,16 @@ class CategoryController extends Controller
     // method PUT
     public function update(Request $request, Category $category)
     {
+        // Debug: Log incoming request data
+        Log::info('Category Update Request', [
+            'category_id' => $category->category_id,
+            'request_data' => $request->all(),
+            'has_category_name' => $request->has('category_name'),
+            'has_description' => $request->has('description'),
+            'category_name_value' => $request->category_name,
+            'description_value' => $request->description,
+        ]);
+
         $validator = Validator::make($request->all(), [
             'category_name' => 'sometimes|string|max:255',
             'image_category' => 'sometimes|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
@@ -129,6 +139,9 @@ class CategoryController extends Controller
             ], 422);
         }
 
+        // Initialize imageUrl variable to avoid undefined variable error
+        $imageUrl = null;
+
         // Handle image with Storage
         if ($request->hasFile('image_category')) {
             $image = $request->file('image_category');
@@ -136,16 +149,50 @@ class CategoryController extends Controller
             $imagePath = $image->storeAs('categories', $imageName, 'public');
             $imageUrl = Storage::url($imagePath);
 
+            // Delete old image if exists
             if ($category->image_category) {
                 Storage::disk('public')->delete(str_replace('/storage/', '', $category->image_category));
             }
         }
 
-        $category->update([
-            'category_name' => $request->category_name ?? $category->category_name,
-            'image_category' => $imageUrl ?? $category->image_category,
-            'description' => $request->description ?? $category->description,
+        // Prepare update data - only update fields that are provided
+        $updateData = [];
+        
+        if ($request->has('category_name')) {
+            $updateData['category_name'] = $request->category_name;
+        }
+        
+        if ($request->has('description')) {
+            $updateData['description'] = $request->description;
+        }
+        
+        if ($imageUrl !== null) {
+            $updateData['image_category'] = $imageUrl;
+        }
+
+        // Debug: Log what we're about to update
+        Log::info('Category Update Data', [
+            'category_id' => $category->category_id,
+            'updateData' => $updateData,
+            'updateData_empty' => empty($updateData)
         ]);
+
+        // Perform the update only if there's data to update
+        if (!empty($updateData)) {
+            Log::info('Performing category update', ['data' => $updateData]);
+            $result = $category->update($updateData);
+            Log::info('Update result', ['result' => $result]);
+            
+            // Force refresh the model to get updated timestamps
+            $category->refresh();
+            Log::info('After refresh', [
+                'updated_at' => $category->updated_at,
+                'category_name' => $category->category_name,
+                'description' => $category->description
+            ]);
+        } else {
+            Log::warning('No update data provided - skipping update');
+        }
 
         return response()->json([
             'message' => 'Category updated successfully',
