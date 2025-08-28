@@ -80,14 +80,14 @@ class CartController extends Controller
             'customer_id' => 'required',
             'product_id' => 'required',
             'quantity' => 'required|integer|min:1',
-            'color' => 'required|string',
+            'color' => 'nullable|string',
             'size' => 'required|string'
         ]);
 
         $customer_id = $request->input('customer_id');
         $product_id = $request->input('product_id');
         $quantity = $request->input('quantity');
-        $color = $request->input('color');
+        $color = $request->input('color', null);
         $size = $request->input('size');
 
         $product = Product::findOrFail($product_id);
@@ -104,11 +104,17 @@ class CartController extends Controller
             ]);
         }
 
-        $cartDetail = CartDetail::where('cart_id', $cart->cart_id)
+        $cartDetailQuery = CartDetail::where('cart_id', $cart->cart_id)
             ->where('product_id', $request->product_id)
-            ->where('color', $request->color)
-            ->where('size', $request->size)
-            ->first();
+            ->where('size', $request->size);
+        
+        if ($request->color) {
+            $cartDetailQuery->where('color', $request->color);
+        } else {
+            $cartDetailQuery->whereNull('color');
+        }
+        
+        $cartDetail = $cartDetailQuery->first();
 
         if ($cartDetail) {
             $cartDetail->quantity += $quantity;

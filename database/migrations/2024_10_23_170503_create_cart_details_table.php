@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('product_id');
             $table->string('product_name');
             $table->integer('quantity');
-            $table->string('color');
+            $table->string('color')->nullable();
             $table->string('size');
             $table->string('image');
             $table->decimal('unit_price', 10, 2);
