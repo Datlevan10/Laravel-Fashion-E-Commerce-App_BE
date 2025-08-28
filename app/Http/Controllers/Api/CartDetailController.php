@@ -123,4 +123,71 @@ class CartDetailController extends Controller
 
         return response()->json(['message' => 'Item removed from cart and total price updated successfully'], 200);
     }
+
+    // method POST - Create cart detail (if needed)
+    public function store(Request $request)
+    {
+        // This method can be implemented later if needed
+        return response()->json(['message' => 'Method not implemented yet'], 501);
+    }
+
+    // method PUT - Update cart item quantity
+    public function update(Request $request, $cart_detail_id)
+    {
+        try {
+            // Validate the request
+            $request->validate([
+                'quantity' => 'required|integer|min:1',
+            ]);
+
+            // Find the cart detail
+            $cartDetail = CartDetail::where('cart_detail_id', $cart_detail_id)->first();
+
+            if (!$cartDetail) {
+                return response()->json([
+                    'message' => 'Cart item not found',
+                    'cart_detail_id' => $cart_detail_id
+                ], 404);
+            }
+
+            // Update quantity and recalculate total_price
+            $newQuantity = $request->input('quantity');
+            $cartDetail->quantity = $newQuantity;
+            $cartDetail->total_price = $cartDetail->unit_price * $newQuantity;
+            $cartDetail->save();
+
+            // Update the cart's overall total_price
+            $cart_id = $cartDetail->cart_id;
+            $cartTotal = CartDetail::where('cart_id', $cart_id)->sum('total_price');
+            $cart = Cart::where('cart_id', $cart_id)->first();
+
+            if ($cart) {
+                $cart->total_price = $cartTotal;
+                $cart->save();
+            }
+
+            return response()->json([
+                'message' => 'Cart item quantity updated successfully',
+                'data' => new CartDetailResource($cartDetail),
+                'cart_total' => $cartTotal
+            ], 200);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            Log::error('Failed to update cart item quantity', [
+                'error' => $e->getMessage(),
+                'cart_detail_id' => $cart_detail_id,
+                'request_data' => $request->all()
+            ]);
+
+            return response()->json([
+                'message' => 'Failed to update cart item quantity',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 }
