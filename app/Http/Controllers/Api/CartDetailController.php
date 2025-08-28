@@ -55,18 +55,37 @@ class CartDetailController extends Controller
         }
     }
 
-    // method GET CartDetails with is_checked_out = false
-    public function getNotOrderedCartDetailByCustomerId()
+    // method GET CartDetails with is_checked_out = false for specific customer
+    public function getNotOrderedCartDetailByCustomerId($customer_id)
     {
-        $uncheckedCartDetails = CartDetail::where('is_checked_out', false)->get();
+        try {
+            // CRITICAL FIX: Filter by BOTH customer_id AND is_checked_out status
+            $uncheckedCartDetails = CartDetail::where('customer_id', $customer_id)
+                                             ->where('is_checked_out', false)
+                                             ->get();
 
-        if ($uncheckedCartDetails->count() > 0) {
+            if ($uncheckedCartDetails->count() > 0) {
+                return response()->json([
+                    'message' => 'Get unchecked cart details for customer successfully',
+                    'customer_id' => $customer_id, // Include customer_id for verification
+                    'data' => CartDetailResource::collection($uncheckedCartDetails)
+                ], 200);
+            } else {
+                return response()->json([
+                    'message' => 'No unchecked cart details found for this customer',
+                    'customer_id' => $customer_id
+                ], 404);
+            }
+        } catch (\Exception $e) {
+            Log::error('Failed to get unchecked cart details for customer', [
+                'error' => $e->getMessage(),
+                'customer_id' => $customer_id
+            ]);
+
             return response()->json([
-                'message' => 'Get unchecked cart details successfully',
-                'data' => CartDetailResource::collection($uncheckedCartDetails)
-            ], 200);
-        } else {
-            return response()->json(['message' => 'No unchecked cart details found'], 404);
+                'message' => 'Failed to get unchecked cart details',
+                'error' => $e->getMessage()
+            ], 500);
         }
     }
 
