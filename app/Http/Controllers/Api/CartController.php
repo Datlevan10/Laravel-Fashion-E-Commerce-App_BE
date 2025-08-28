@@ -87,7 +87,11 @@ class CartController extends Controller
         $customer_id = $request->input('customer_id');
         $product_id = $request->input('product_id');
         $quantity = $request->input('quantity');
-        $color = $request->input('color', 'N/A');
+        // Handle nullable color - ensure we always have a non-null value for database
+        $color = $request->input('color');
+        if (empty($color) || is_null($color)) {
+            $color = 'N/A'; // Default value for meat/fish products without color
+        }
         $size = $request->input('size');
 
         $product = Product::findOrFail($product_id);
@@ -104,9 +108,10 @@ class CartController extends Controller
             ]);
         }
 
+        // Look for existing cart item with same product, color, and size
         $cartDetail = CartDetail::where('cart_id', $cart->cart_id)
             ->where('product_id', $request->product_id)
-            ->where('color', $color)
+            ->where('color', $color) // Now always has a non-null value
             ->where('size', $request->size)
             ->first();
 
