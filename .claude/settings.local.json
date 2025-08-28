@@ -19,7 +19,9 @@
       "Bash(apt list:*)",
       "Bash(docker:*)",
       "Bash(composer --version)",
-      "Bash(rg:*)"
+      "Bash(rg:*)",
+      "Bash(curl:*)",
+      "Bash(ls:*)"
     ],
     "deny": []
   }

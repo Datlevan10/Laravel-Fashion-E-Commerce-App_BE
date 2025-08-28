@@ -14,20 +14,21 @@ return new class extends Migration
         Schema::dropIfExists('products');
 
         Schema::create('products', function (Blueprint $table) {
-            $table->string('productId')->primary();
-            $table->string('categoryId');
-            $table->string('productName');
+            $table->string('product_id')->primary();
+            $table->string('category_id');
+            $table->string('product_name');
             $table->text('description');
             $table->json('color');
             $table->json('size');
             $table->json('image');
-            $table->decimal('oldPrice', 10, 2)->nullable();
-            $table->decimal('newPrice', 10, 2)->nullable();
-            $table->integer('totalReview')->default(0);
-            $table->integer('averageReview')->default(0);
+            $table->decimal('old_price', 10, 2)->nullable();
+            $table->decimal('new_price', 10, 2)->nullable();
+            $table->integer('total_review')->default(0);
+            $table->integer('average_review')->default(0);
+            $table->text('note')->nullable();
             $table->timestamps();
 
-            $table->foreign('categoryId')->references('categoryId')->on('categories')->onDelete('cascade');
+            $table->foreign('category_id')->references('category_id')->on('categories')->onDelete('cascade');
         });
     }
 

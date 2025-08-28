@@ -707,7 +707,7 @@ class AdminController extends Controller
                         'old_price' => $product->old_price,
                         'total_sold' => $product->total_sold ?? 0,
                         'total_revenue' => $product->total_revenue ?? 0,
-                        'category' => $product->category ? $product->category->categoryName : null,
+                        'category' => $product->category ? $product->category->category_name : null,
                         'image' => $product->image ? (is_array($product->image) && isset($product->image[0]) ? $product->image[0] : $product->image) : null
                     ];
                 })
