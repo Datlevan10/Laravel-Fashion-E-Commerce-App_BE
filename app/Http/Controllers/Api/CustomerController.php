@@ -195,7 +195,21 @@ class CustomerController extends Controller
             ], 422);
         }
 
-        $hashed_password = Hash::make($request->password);
+        // Only hash password if it's provided in the request
+        $updateData = [
+            'user_name' => $request->user_name ?? $customer->user_name,
+            'full_name' => $request->full_name ?? $customer->full_name,
+            'gender' => $request->gender ?? $customer->gender,
+            'date_of_birth' => $date_of_birth ?? $customer->date_of_birth,
+            'email' => $request->email ?? $customer->email,
+            'phone_number' => $request->phone_number ?? $customer->phone_number,
+            'address' => $request->address ?? $customer->address,
+        ];
+
+        // Only update password if it's provided
+        if ($request->filled('password')) {
+            $updateData['password'] = Hash::make($request->password);
+        }
 
         // Handle image with Storage
         if ($request->hasFile('image')) {
@@ -206,19 +220,12 @@ class CustomerController extends Controller
             $imageName = time() . '.' . $image->getClientOriginalExtension();
             $imagePath = $image->storeAs('customers', $imageName, 'public');
             $imageUrl = Storage::url($imagePath);
+            $updateData['image'] = $imageUrl;
+        } else {
+            $updateData['image'] = $customer->image;
         }
 
-        $customer->update([
-            'user_name' => $request->user_name ?? $customer->user_name,
-            'full_name' => $request->full_name ?? $customer->full_name,
-            'gender' => $request->gender ?? $customer->gender,
-            'date_of_birth' => $date_of_birth ?? $customer->date_of_birth,
-            'image' => $imageUrl ?? $customer->image,
-            'email' => $request->email ?? $customer->email,
-            'phone_number' => $request->phone_number ?? $customer->phone_number,
-            'password' => $hashed_password ?? $customer->password,
-            'address' => $request->address ?? $customer->address,
-        ]);
+        $customer->update($updateData);
 
         return response()->json([
             'message' => 'Customer updated success',
