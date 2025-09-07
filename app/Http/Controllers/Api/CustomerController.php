@@ -377,4 +377,42 @@ class CustomerController extends Controller
             'expires_in' => 900,
         ], 200);
     }
+
+    // Method to update customer password
+    public function updatePassword(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'customer_id' => 'required|integer|exists:customers,customer_id',
+            'old_password' => 'required|string',
+            'new_password' => [
+                'required',
+                'string',
+                'min:8',
+                'regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/',
+            ],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $customer = Customer::find($request->customer_id);
+
+        if (!Hash::check($request->old_password, $customer->password)) {
+            return response()->json([
+                'message' => 'Old password is incorrect',
+                'error_code' => 'OLD_PASSWORD_INVALID',
+            ], 401);
+        }
+
+        $customer->password = Hash::make($request->new_password);
+        $customer->save();
+
+        return response()->json([
+            'message' => 'Password updated successfully',
+        ], 200);
+    }
 }
