@@ -74,7 +74,7 @@ Route::prefix('')->group(function () {
     Route::middleware('api')->post('customers/auth/login', [CustomerController::class, 'authenticateLoginCustomer']);
     Route::middleware('auth:sanctum')->post('customers/auth/logout', [CustomerController::class, 'logout']);
     Route::post('customers/auth/refresh-token', [CustomerController::class, 'refreshAccessToken']);
-    Route::middleware('api')->post('customers/update-password', [CustomerController::class, 'updatePassword']);
+    Route::middleware('api')->post('customers/auth/update-password', [CustomerController::class, 'updatePassword']);
     // Route::middleware('auth:sanctum')->post('customers/auth/refresh-token', [CustomerController::class, 'refreshAccessToken']);
     Route::middleware('auth:sanctum')->get('/profile', function (Request $request) {
         return response()->json($request->user());

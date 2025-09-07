@@ -382,7 +382,7 @@ class CustomerController extends Controller
     public function updatePassword(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'customer_id' => 'required|integer|exists:customers,customer_id',
+            'customer_id' => 'required|string|exists:customers,customer_id',
             'old_password' => 'required|string',
             'new_password' => [
                 'required',
