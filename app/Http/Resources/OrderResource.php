@@ -28,6 +28,10 @@ class OrderResource extends JsonResource
             'order_status' => $this->order_status,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
+            
+            // Include payment transaction when loaded
+            'payment_transactions' => PaymentTransactionResource::collection($this->whenLoaded('paymentTransactions')),
+            'latest_payment_transaction' => new PaymentTransactionResource($this->whenLoaded('latestPaymentTransaction')),
         ];
     }
 }

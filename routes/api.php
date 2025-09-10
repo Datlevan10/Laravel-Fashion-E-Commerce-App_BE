@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\{
     NotificationController,
     OrderController,
     OrderDetailController,
+    PaymentController,
     ProductFavoriteController,
     ReportReviewController,
     ReviewController,
@@ -115,6 +116,22 @@ Route::prefix('')->group(function () {
     Route::apiResource('orders', OrderController::class);
 
     Route::apiResource('order_details', OrderDetailController::class);
+
+    // Payment Routes
+    Route::prefix('payments')->group(function () {
+        Route::get('/methods', [PaymentController::class, 'getPaymentMethods']);
+        Route::post('/{orderId}/create', [PaymentController::class, 'createPayment']);
+        Route::get('/{transactionId}', [PaymentController::class, 'show']);
+        Route::get('/{transactionId}/status', [PaymentController::class, 'checkPaymentStatus']);
+        Route::post('/{transactionId}/confirm', [PaymentController::class, 'confirmPayment']);
+        Route::patch('/{transactionId}/cancel', [PaymentController::class, 'cancelPayment']);
+        Route::get('/order/{orderId}', [PaymentController::class, 'getPaymentsByOrder']);
+        Route::post('/callback', [PaymentController::class, 'handleCallback']);
+        Route::post('/momo/callback', [PaymentController::class, 'handleCallback']);
+        Route::post('/momo/ipn', [PaymentController::class, 'handleCallback']);
+        Route::post('/vnpay/callback', [PaymentController::class, 'handleCallback']);
+        Route::post('/vnpay/ipn', [PaymentController::class, 'handleCallback']);
+    });
 
     // Notification Routes
     Route::prefix('notifications')->group(function () {

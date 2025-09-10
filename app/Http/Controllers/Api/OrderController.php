@@ -8,11 +8,15 @@ use App\Models\Order;
 use App\Models\Customer;
 use App\Models\CartDetail;
 use App\Models\OrderDetail;
+use App\Models\PaymentTransaction;
+use App\Models\PaymentMethod;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\OrderResource;
+use App\Http\Resources\PaymentTransactionResource;
+use App\Services\QRPaymentService;
 use Illuminate\Support\Facades\Validator;
 
 class OrderController extends Controller
@@ -37,7 +41,7 @@ class OrderController extends Controller
         $validator = Validator::make($request->all(), [
             'cart_id' => 'required|exists:carts,cart_id',
             'customer_id' => 'required|exists:customers,customer_id',
-            'payment_method' => 'required|string',
+            'payment_method_id' => 'required|exists:payment_methods,payment_method_id',
             'shipping_address' => 'nullable|string',
             'discount' => 'nullable|numeric|min:0|max:100'
         ]);
@@ -62,6 +66,11 @@ class OrderController extends Controller
                 return response()->json(['message' => 'Customer not found'], 404);
             }
 
+            $paymentMethod = PaymentMethod::find($request->payment_method_id);
+            if (!$paymentMethod || !$paymentMethod->is_active) {
+                return response()->json(['message' => 'Payment method not found or inactive'], 404);
+            }
+
             $cartDetails = CartDetail::where('cart_id', $request->cart_id)
                 ->where('is_checked_out', false)
                 ->get();
@@ -73,17 +82,33 @@ class OrderController extends Controller
             $shippingAddress = $request->shipping_address ?? $customer->address;
             $totalPrice = $cartDetails->sum('total_price');
 
+            // Validate amount against payment method limits
+            if ($totalPrice < $paymentMethod->minimum_amount) {
+                return response()->json([
+                    'message' => 'Amount is below minimum limit for this payment method',
+                    'minimum_amount' => $paymentMethod->minimum_amount
+                ], 400);
+            }
+
+            if ($paymentMethod->maximum_amount && $totalPrice > $paymentMethod->maximum_amount) {
+                return response()->json([
+                    'message' => 'Amount exceeds maximum limit for this payment method',
+                    'maximum_amount' => $paymentMethod->maximum_amount
+                ], 400);
+            }
+
             $order = Order::create([
                 'order_id' => 'ORD' . uniqid(),
                 'customer_id' => $request->customer_id,
                 'order_date' => Carbon::now(),
-                'payment_method' => $request->payment_method,
+                'payment_method' => $paymentMethod->name,
                 'shipping_address' => $shippingAddress,
                 'discount' => $request->discount ?? 0,
                 'total_price' => $totalPrice,
                 'order_status' => 'pending'
             ]);
 
+            // Create order details
             foreach ($cartDetails as $detail) {
                 OrderDetail::create([
                     'order_detail_id' => 'OD' . uniqid(),
@@ -101,6 +126,32 @@ class OrderController extends Controller
                 $detail->update(['is_checked_out' => true]);
             }
 
+            // Calculate transaction fee
+            $feeAmount = ($totalPrice * $paymentMethod->transaction_fee_percentage / 100) + $paymentMethod->transaction_fee_fixed;
+
+            // Create payment transaction
+            $paymentTransaction = PaymentTransaction::create([
+                'transaction_id' => 'PAY' . uniqid(),
+                'order_id' => $order->order_id,
+                'payment_method_id' => $request->payment_method_id,
+                'amount' => $totalPrice,
+                'fee_amount' => $feeAmount,
+                'currency' => 'VND',
+                'status' => 'pending',
+                'reference_number' => $order->order_id,
+            ]);
+
+            // Generate QR code for payment
+            if (in_array($paymentMethod->code, ['momo', 'vnpay', 'bank_transfer'])) {
+                $qrService = new QRPaymentService();
+                $qrData = $qrService->generateQRCode($paymentTransaction);
+                
+                $paymentTransaction->update([
+                    'qr_code_url' => $qrData['qr_code_url'] ?? null,
+                    'qr_code_payload' => $qrData['qr_code_payload'] ?? null,
+                ]);
+            }
+
             $cart = Cart::where('cart_id', $request->cart_id)->first();
             $cart->update(['cart_status' => true]);
 
@@ -108,7 +159,10 @@ class OrderController extends Controller
 
             return response()->json([
                 'message' => 'Order created successfully from cart',
-                'data' => new OrderResource($order)
+                'data' => [
+                    'order' => new OrderResource($order),
+                    'payment_transaction' => new PaymentTransactionResource($paymentTransaction->load(['paymentMethod']))
+                ]
             ], 201);
         } catch (\Exception $e) {
             DB::rollBack();

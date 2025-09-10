@@ -69,4 +69,14 @@ class Order extends Model
     {
         return $this->hasMany(OrderDetail::class, 'order_id', 'order_id');
     }
+
+    public function paymentTransactions()
+    {
+        return $this->hasMany(PaymentTransaction::class, 'order_id', 'order_id');
+    }
+
+    public function latestPaymentTransaction()
+    {
+        return $this->hasOne(PaymentTransaction::class, 'order_id', 'order_id')->latest();
+    }
 }
