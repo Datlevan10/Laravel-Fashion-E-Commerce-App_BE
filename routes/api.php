@@ -131,6 +131,11 @@ Route::prefix('')->group(function () {
         Route::post('/momo/ipn', [PaymentController::class, 'handleCallback']);
         Route::post('/vnpay/callback', [PaymentController::class, 'handleCallback']);
         Route::post('/vnpay/ipn', [PaymentController::class, 'handleCallback']);
+        
+        // ZaloPay Routes
+        Route::post('/zalopay/create', [PaymentController::class, 'createZaloPayPayment']);
+        Route::post('/zalopay/query', [PaymentController::class, 'queryZaloPayStatus']);
+        Route::post('/zalopay/callback', [PaymentController::class, 'handleZaloPayCallback']);
     });
 
     // Notification Routes

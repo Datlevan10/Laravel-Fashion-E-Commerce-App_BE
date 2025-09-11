@@ -392,4 +392,224 @@ class PaymentController extends Controller
             return response()->json(['message' => 'Failed to check payment status', 'error' => $e->getMessage()], 500);
         }
     }
+
+    /**
+     * Create ZaloPay payment transaction
+     * POST /api/payments/zalopay/create
+     */
+    public function createZaloPayPayment(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'order_id' => 'required|exists:orders,order_id',
+            'amount' => 'required|numeric|min:1000',
+            'description' => 'nullable|string'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $validator->messages(),
+            ], 422);
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $order = Order::where('order_id', $request->order_id)->first();
+            if (!$order) {
+                return response()->json(['message' => 'Order not found'], 404);
+            }
+
+            // Find ZaloPay payment method
+            $paymentMethod = PaymentMethod::where('code', 'zalopay')->where('is_active', true)->first();
+            if (!$paymentMethod) {
+                return response()->json(['message' => 'ZaloPay payment method not available'], 404);
+            }
+
+            // Check if payment transaction already exists
+            $existingTransaction = PaymentTransaction::where('order_id', $request->order_id)
+                ->where('payment_method_id', $paymentMethod->payment_method_id)
+                ->first();
+
+            if ($existingTransaction && $existingTransaction->status === 'pending') {
+                return response()->json([
+                    'message' => 'ZaloPay payment already exists for this order',
+                    'data' => new PaymentTransactionResource($existingTransaction->load(['paymentMethod']))
+                ], 200);
+            }
+
+            $amount = $request->amount ?: $order->total_price;
+            $feeAmount = ($amount * $paymentMethod->transaction_fee_percentage / 100) + $paymentMethod->transaction_fee_fixed;
+
+            // Create payment transaction
+            $paymentTransaction = PaymentTransaction::create([
+                'transaction_id' => 'ZLP' . uniqid(),
+                'order_id' => $order->order_id,
+                'payment_method_id' => $paymentMethod->payment_method_id,
+                'amount' => $amount,
+                'fee_amount' => $feeAmount,
+                'currency' => 'VND',
+                'status' => 'pending',
+                'reference_number' => $order->order_id,
+            ]);
+
+            // Generate ZaloPay payment data
+            $zaloPayData = $this->qrPaymentService->generateZaloPayment($paymentTransaction, $request->description);
+            
+            $paymentTransaction->update([
+                'gateway_response' => $zaloPayData,
+                'gateway_transaction_id' => $zaloPayData['app_trans_id'] ?? null,
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'ZaloPay payment created successfully',
+                'data' => [
+                    'transaction' => new PaymentTransactionResource($paymentTransaction->load(['paymentMethod'])),
+                    'zalopay_data' => $zaloPayData
+                ]
+            ], 201);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Failed to create ZaloPay payment', [
+                'error' => $e->getMessage(),
+                'request' => $request->all()
+            ]);
+            return response()->json(['message' => 'Failed to create ZaloPay payment', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Query ZaloPay payment status
+     * POST /api/payments/zalopay/query
+     */
+    public function queryZaloPayStatus(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'app_trans_id' => 'required|string'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $validator->messages(),
+            ], 422);
+        }
+
+        try {
+            // Find transaction by gateway_transaction_id (app_trans_id)
+            $transaction = PaymentTransaction::where('gateway_transaction_id', $request->app_trans_id)->first();
+            
+            if (!$transaction) {
+                return response()->json(['message' => 'Transaction not found'], 404);
+            }
+
+            // Query ZaloPay status
+            $statusResult = $this->qrPaymentService->queryZaloPayStatus($request->app_trans_id);
+            
+            // Update transaction status based on ZaloPay response
+            if (isset($statusResult['return_code'])) {
+                $newStatus = $statusResult['return_code'] == 1 ? 'completed' : ($statusResult['return_code'] == 2 ? 'failed' : 'pending');
+                
+                $transaction->update([
+                    'status' => $newStatus,
+                    'gateway_response' => array_merge($transaction->gateway_response ?? [], ['query_result' => $statusResult]),
+                    'processed_at' => $newStatus === 'completed' ? Carbon::now() : $transaction->processed_at,
+                    'failure_reason' => $newStatus === 'failed' ? ($statusResult['return_message'] ?? 'Payment failed') : null
+                ]);
+
+                // Update order status
+                if ($newStatus === 'completed') {
+                    $transaction->order->update(['order_status' => 'confirmed']);
+                } elseif ($newStatus === 'failed') {
+                    $transaction->order->update(['order_status' => 'cancelled']);
+                }
+            }
+
+            return response()->json([
+                'message' => 'ZaloPay status queried successfully',
+                'data' => [
+                    'transaction' => new PaymentTransactionResource($transaction->load(['paymentMethod'])),
+                    'zalopay_status' => $statusResult
+                ]
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('Failed to query ZaloPay status', [
+                'error' => $e->getMessage(),
+                'app_trans_id' => $request->app_trans_id
+            ]);
+            return response()->json(['message' => 'Failed to query ZaloPay status', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Handle ZaloPay callback/webhook
+     * POST /api/payments/zalopay/callback
+     */
+    public function handleZaloPayCallback(Request $request)
+    {
+        DB::beginTransaction();
+
+        try {
+            Log::info('ZaloPay callback received', ['data' => $request->all()]);
+
+            // Validate ZaloPay callback
+            $isValidCallback = $this->qrPaymentService->validateZaloPayCallback($request->all());
+            
+            if (!$isValidCallback) {
+                Log::warning('Invalid ZaloPay callback signature', ['data' => $request->all()]);
+                return response()->json(['return_code' => -1, 'return_message' => 'Invalid signature'], 400);
+            }
+
+            $appTransId = $request->input('app_trans_id');
+            $transaction = PaymentTransaction::where('gateway_transaction_id', $appTransId)->first();
+            
+            if (!$transaction) {
+                Log::warning('Transaction not found for ZaloPay callback', ['app_trans_id' => $appTransId]);
+                return response()->json(['return_code' => -1, 'return_message' => 'Transaction not found'], 404);
+            }
+
+            // Determine payment status
+            $status = 'failed';
+            if ($request->input('status') == 1) {
+                $status = 'completed';
+            } elseif ($request->input('status') == 2) {
+                $status = 'failed';
+            }
+
+            // Update transaction
+            $transaction->update([
+                'status' => $status,
+                'gateway_response' => array_merge($transaction->gateway_response ?? [], ['callback' => $request->all()]),
+                'processed_at' => $status === 'completed' ? Carbon::now() : null,
+                'failure_reason' => $status === 'failed' ? 'ZaloPay payment failed' : null
+            ]);
+
+            // Update order status
+            $order = $transaction->order;
+            if ($status === 'completed') {
+                $order->update(['order_status' => 'confirmed']);
+            } elseif ($status === 'failed') {
+                $order->update(['order_status' => 'cancelled']);
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'return_code' => 1,
+                'return_message' => 'success'
+            ], 200);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('ZaloPay callback processing failed', [
+                'error' => $e->getMessage(),
+                'callback_data' => $request->all()
+            ]);
+            return response()->json([
+                'return_code' => -1,
+                'return_message' => 'Internal server error'
+            ], 500);
+        }
+    }
 }

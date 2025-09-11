@@ -19,6 +19,8 @@ class QRPaymentService
                 return $this->generateMoMoQR($transaction);
             case 'vnpay':
                 return $this->generateVNPayQR($transaction);
+            case 'zalopay':
+                return $this->generateZaloPayQR($transaction);
             case 'bank_transfer':
                 return $this->generateBankTransferQR($transaction);
             default:
@@ -163,6 +165,129 @@ class QRPaymentService
     }
 
     /**
+     * Generate ZaloPay payment data
+     */
+    public function generateZaloPayment(PaymentTransaction $transaction, $description = null): array
+    {
+        $config = $this->getZaloPayConfig();
+        $appTransId = $config['app_id'] . '_' . date('ymd') . '_' . $transaction->transaction_id;
+        
+        $embedData = json_encode([
+            'transaction_id' => $transaction->transaction_id,
+            'order_id' => $transaction->order_id
+        ]);
+
+        $items = json_encode([
+            [
+                'itemid' => $transaction->order_id,
+                'itemname' => $description ?: "Payment for order {$transaction->order_id}",
+                'itemprice' => (int)$transaction->amount,
+                'itemquantity' => 1
+            ]
+        ]);
+
+        $orderData = [
+            'app_id' => $config['app_id'],
+            'app_user' => $transaction->order->customer_id ?? 'user_' . time(),
+            'app_time' => round(microtime(true) * 1000),
+            'amount' => (int)$transaction->amount,
+            'app_trans_id' => $appTransId,
+            'embed_data' => $embedData,
+            'item' => $items,
+            'description' => $description ?: "Payment for order {$transaction->order_id}",
+            'callback_url' => config('app.url') . '/api/payments/zalopay/callback'
+        ];
+
+        $orderData['mac'] = $this->generateZaloPayMac($orderData, $config['key1']);
+
+        return array_merge($orderData, [
+            'payment_url' => 'zalopayapp://open',
+            'qr_code_url' => $this->generateQRImageUrl($appTransId)
+        ]);
+    }
+
+    /**
+     * Generate ZaloPay QR code (for backward compatibility)
+     */
+    private function generateZaloPayQR(PaymentTransaction $transaction): array
+    {
+        return $this->generateZaloPayment($transaction);
+    }
+
+    /**
+     * Query ZaloPay transaction status
+     */
+    public function queryZaloPayStatus(string $appTransId): array
+    {
+        $config = $this->getZaloPayConfig();
+        
+        $queryData = [
+            'app_id' => $config['app_id'],
+            'app_trans_id' => $appTransId
+        ];
+
+        $queryData['mac'] = hash_hmac('sha256', $config['app_id'] . '|' . $appTransId . '|' . $config['key1'], $config['key1']);
+
+        // In production, make HTTP request to ZaloPay query endpoint
+        // For demo, return mock response
+        return [
+            'return_code' => 1, // 1: success, 2: failed, 3: pending
+            'return_message' => 'Giao dịch thành công',
+            'sub_return_code' => 1,
+            'sub_return_message' => '',
+            'is_processing' => false,
+            'amount' => 0,
+            'zp_trans_id' => time()
+        ];
+    }
+
+    /**
+     * Validate ZaloPay callback signature
+     */
+    public function validateZaloPayCallback(array $callbackData): bool
+    {
+        $config = $this->getZaloPayConfig();
+        
+        if (!isset($callbackData['mac'])) {
+            return false;
+        }
+
+        $reqMac = $callbackData['mac'];
+        unset($callbackData['mac']);
+
+        $expectedMac = hash_hmac('sha256', 
+            $callbackData['data'] . '|' . $config['key2'], 
+            $config['key2']
+        );
+
+        return hash_equals($reqMac, $expectedMac);
+    }
+
+    /**
+     * Get ZaloPay configuration
+     */
+    private function getZaloPayConfig(): array
+    {
+        return [
+            'app_id' => config('services.zalopay.app_id', '2553'),
+            'key1' => config('services.zalopay.key1', 'PcY4iZIKFCIdgZvA6ueMcMHHUbRLYjPL'),
+            'key2' => config('services.zalopay.key2', 'kLtgPl8HHhfvMuDHPwKfgfsY4Ydm9eIz'),
+            'endpoint' => config('services.zalopay.endpoint', 'https://sb-openapi.zalopay.vn/v2')
+        ];
+    }
+
+    /**
+     * Generate ZaloPay MAC signature
+     */
+    private function generateZaloPayMac(array $data, string $key): string
+    {
+        $macData = $data['app_id'] . '|' . $data['app_trans_id'] . '|' . $data['app_user'] . '|' . 
+                   $data['amount'] . '|' . $data['app_time'] . '|' . $data['embed_data'] . '|' . $data['item'];
+        
+        return hash_hmac('sha256', $macData, $key);
+    }
+
+    /**
      * Validate payment status from gateway response
      */
     public function validatePaymentStatus(string $gatewayCode, array $response): string
@@ -172,6 +297,8 @@ class QRPaymentService
                 return $this->validateMoMoStatus($response);
             case 'vnpay':
                 return $this->validateVNPayStatus($response);
+            case 'zalopay':
+                return $this->validateZaloPayStatus($response);
             default:
                 return 'pending';
         }
@@ -195,6 +322,20 @@ class QRPaymentService
     {
         if (isset($response['vnp_ResponseCode'])) {
             return $response['vnp_ResponseCode'] == '00' ? 'completed' : 'failed';
+        }
+        return 'pending';
+    }
+
+    /**
+     * Validate ZaloPay payment status
+     */
+    private function validateZaloPayStatus(array $response): string
+    {
+        if (isset($response['status'])) {
+            return $response['status'] == 1 ? 'completed' : 'failed';
+        }
+        if (isset($response['return_code'])) {
+            return $response['return_code'] == 1 ? 'completed' : 'failed';
         }
         return 'pending';
     }
