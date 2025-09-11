@@ -47,6 +47,127 @@ class PaymentController extends Controller
     }
 
     /**
+     * Initialize payment methods (for setup/testing)
+     * POST /api/payments/initialize
+     */
+    public function initializePaymentMethods()
+    {
+        try {
+            // Check if any payment methods exist
+            $existingCount = PaymentMethod::count();
+            
+            if ($existingCount > 0) {
+                $paymentMethods = PaymentMethod::all();
+                return response()->json([
+                    'message' => 'Payment methods already exist',
+                    'count' => $existingCount,
+                    'data' => PaymentMethodResource::collection($paymentMethods)
+                ], 200);
+            }
+
+            // Create basic payment methods
+            $methods = [
+                [
+                    'payment_method_id' => 'PM001',
+                    'name' => 'MoMo E-Wallet',
+                    'code' => 'momo',
+                    'type' => 'digital_wallet',
+                    'logo' => 'momo-logo.png',
+                    'is_active' => true,
+                    'transaction_fee_percentage' => 0.5,
+                    'transaction_fee_fixed' => 0,
+                    'minimum_amount' => 10000,
+                    'maximum_amount' => 50000000,
+                    'api_config' => [
+                        'partner_code' => 'DEMO',
+                        'access_key' => 'demo_access_key',
+                        'secret_key' => 'demo_secret_key',
+                        'endpoint' => 'https://test-payment.momo.vn'
+                    ],
+                    'supported_currencies' => ['VND'],
+                    'description' => 'Pay with MoMo E-Wallet',
+                    'sort_order' => 1,
+                ],
+                [
+                    'payment_method_id' => 'PM002',
+                    'name' => 'VNPay',
+                    'code' => 'vnpay',
+                    'type' => 'digital_wallet',
+                    'logo' => 'vnpay-logo.png',
+                    'is_active' => true,
+                    'transaction_fee_percentage' => 0.8,
+                    'transaction_fee_fixed' => 0,
+                    'minimum_amount' => 5000,
+                    'maximum_amount' => 100000000,
+                    'api_config' => [
+                        'tmn_code' => 'DEMO',
+                        'hash_secret' => 'demo_hash_secret',
+                        'endpoint' => 'https://sandbox.vnpayment.vn'
+                    ],
+                    'supported_currencies' => ['VND'],
+                    'description' => 'Pay with VNPay',
+                    'sort_order' => 2,
+                ],
+                [
+                    'payment_method_id' => 'PM004',
+                    'name' => 'Cash on Delivery',
+                    'code' => 'cod',
+                    'type' => 'cash_on_delivery',
+                    'logo' => 'cod-logo.png',
+                    'is_active' => true,
+                    'transaction_fee_percentage' => 0,
+                    'transaction_fee_fixed' => 15000,
+                    'minimum_amount' => 0,
+                    'maximum_amount' => 5000000,
+                    'api_config' => null,
+                    'supported_currencies' => ['VND'],
+                    'description' => 'Pay when receiving goods',
+                    'sort_order' => 4,
+                ],
+                [
+                    'payment_method_id' => 'PM005',
+                    'name' => 'ZaloPay',
+                    'code' => 'zalopay',
+                    'type' => 'digital_wallet',
+                    'logo' => '/images/payment-methods/zalopay-logo.png',
+                    'is_active' => true,
+                    'transaction_fee_percentage' => 2.5,
+                    'transaction_fee_fixed' => 0,
+                    'minimum_amount' => 1000,
+                    'maximum_amount' => 50000000,
+                    'api_config' => [
+                        'app_id' => '2553',
+                        'key1' => 'PcY4iZIKFCIdgZvA6ueMcMHHUbRLYjPL',
+                        'key2' => 'kLtgPl8HHhfvMuDHPwKfgfsY4Ydm9eIz',
+                        'endpoint' => 'https://sb-openapi.zalopay.vn/v2'
+                    ],
+                    'supported_currencies' => ['VND'],
+                    'description' => 'Thanh toán qua ví điện tử ZaloPay - Nhanh chóng, an toàn',
+                    'sort_order' => 3,
+                ]
+            ];
+
+            foreach ($methods as $method) {
+                PaymentMethod::create($method);
+            }
+
+            $paymentMethods = PaymentMethod::all();
+            
+            return response()->json([
+                'message' => 'Payment methods initialized successfully',
+                'count' => count($methods),
+                'data' => PaymentMethodResource::collection($paymentMethods)
+            ], 201);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to initialize payment methods', [
+                'error' => $e->getMessage()
+            ]);
+            return response()->json(['message' => 'Failed to initialize payment methods', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
      * Create/Generate QR code for the order
      * POST /api/payments/{orderId}/create
      */

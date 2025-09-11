@@ -120,6 +120,7 @@ Route::prefix('')->group(function () {
     // Payment Routes
     Route::prefix('payments')->group(function () {
         Route::get('/methods', [PaymentController::class, 'getPaymentMethods']);
+        Route::post('/initialize', [PaymentController::class, 'initializePaymentMethods']);
         Route::post('/{orderId}/create', [PaymentController::class, 'createPayment']);
         Route::get('/{transactionId}', [PaymentController::class, 'show']);
         Route::get('/{transactionId}/status', [PaymentController::class, 'checkPaymentStatus']);
