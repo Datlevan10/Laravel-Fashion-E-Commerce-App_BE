@@ -111,7 +111,7 @@ class PaymentController extends Controller
                 [
                     'payment_method_id' => 'PM004',
                     'name' => 'Cash on Delivery',
-                    'code' => 'cod',
+                    'code' => 'cash_on_delivery',
                     'type' => 'cash_on_delivery',
                     'logo' => 'cod-logo.png',
                     'is_active' => true,
@@ -164,6 +164,40 @@ class PaymentController extends Controller
                 'error' => $e->getMessage()
             ]);
             return response()->json(['message' => 'Failed to initialize payment methods', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Debug payment methods status
+     * GET /api/payments/debug
+     */
+    public function debugPaymentMethods()
+    {
+        try {
+            $allMethods = PaymentMethod::all();
+            $activeMethods = PaymentMethod::where('is_active', true)->get();
+            
+            return response()->json([
+                'message' => 'Payment methods debug info',
+                'total_count' => $allMethods->count(),
+                'active_count' => $activeMethods->count(),
+                'all_methods' => $allMethods->map(function($method) {
+                    return [
+                        'id' => $method->payment_method_id,
+                        'name' => $method->name,
+                        'code' => $method->code,
+                        'type' => $method->type,
+                        'is_active' => $method->is_active,
+                        'created_at' => $method->created_at
+                    ];
+                }),
+                'available_codes' => $activeMethods->pluck('code')->toArray()
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Debug failed',
+                'error' => $e->getMessage()
+            ], 500);
         }
     }
 
