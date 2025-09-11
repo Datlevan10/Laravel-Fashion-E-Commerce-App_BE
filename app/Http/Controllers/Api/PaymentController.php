@@ -202,6 +202,42 @@ class PaymentController extends Controller
     }
 
     /**
+     * Add missing QR code columns to payment_transactions table
+     * POST /api/payments/fix-schema
+     */
+    public function fixPaymentTransactionsSchema()
+    {
+        try {
+            // Check if columns already exist
+            if (\Schema::hasColumn('payment_transactions', 'qr_code_url')) {
+                return response()->json([
+                    'message' => 'QR code columns already exist in payment_transactions table',
+                    'columns' => ['qr_code_url', 'qr_code_payload']
+                ], 200);
+            }
+
+            // Add the missing columns
+            \Schema::table('payment_transactions', function ($table) {
+                $table->text('qr_code_url')->nullable()->after('gateway_response');
+                $table->text('qr_code_payload')->nullable()->after('qr_code_url');
+            });
+
+            return response()->json([
+                'message' => 'QR code columns added successfully to payment_transactions table',
+                'columns' => ['qr_code_url', 'qr_code_payload']
+            ], 201);
+        } catch (\Exception $e) {
+            Log::error('Failed to fix payment transactions schema', [
+                'error' => $e->getMessage()
+            ]);
+            return response()->json([
+                'message' => 'Failed to fix schema',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Create/Generate QR code for the order
      * POST /api/payments/{orderId}/create
      */
@@ -247,10 +283,37 @@ class PaymentController extends Controller
             // Generate QR code
             $qrData = $this->qrPaymentService->generateQRCode($paymentTransaction);
             
-            $paymentTransaction->update([
-                'qr_code_url' => $qrData['qr_code_url'] ?? null,
-                'qr_code_payload' => $qrData['qr_code_payload'] ?? null,
-            ]);
+            // Check if QR code columns exist before updating
+            try {
+                if (\Schema::hasColumn('payment_transactions', 'qr_code_url')) {
+                    $paymentTransaction->update([
+                        'qr_code_url' => $qrData['qr_code_url'] ?? null,
+                        'qr_code_payload' => $qrData['qr_code_payload'] ?? null,
+                    ]);
+                } else {
+                    // Store QR data in gateway_response if columns don't exist
+                    $paymentTransaction->update([
+                        'gateway_response' => array_merge(
+                            $paymentTransaction->gateway_response ?? [],
+                            [
+                                'qr_code_url' => $qrData['qr_code_url'] ?? null,
+                                'qr_code_payload' => $qrData['qr_code_payload'] ?? null,
+                            ]
+                        ),
+                    ]);
+                }
+            } catch (\Exception $e) {
+                // Fallback: Store in gateway_response
+                $paymentTransaction->update([
+                    'gateway_response' => array_merge(
+                        $paymentTransaction->gateway_response ?? [],
+                        [
+                            'qr_code_url' => $qrData['qr_code_url'] ?? null,
+                            'qr_code_payload' => $qrData['qr_code_payload'] ?? null,
+                        ]
+                    ),
+                ]);
+            }
 
             DB::commit();
 

@@ -13,6 +13,7 @@ use App\Models\PaymentMethod;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\OrderResource;
 use App\Http\Resources\PaymentTransactionResource;
@@ -153,10 +154,37 @@ class OrderController extends Controller
                 $qrService = new QRPaymentService();
                 $qrData = $qrService->generateQRCode($paymentTransaction);
                 
-                $paymentTransaction->update([
-                    'qr_code_url' => $qrData['qr_code_url'] ?? null,
-                    'qr_code_payload' => $qrData['qr_code_payload'] ?? null,
-                ]);
+                // Check if QR code columns exist before updating
+                try {
+                    if (Schema::hasColumn('payment_transactions', 'qr_code_url')) {
+                        $paymentTransaction->update([
+                            'qr_code_url' => $qrData['qr_code_url'] ?? null,
+                            'qr_code_payload' => $qrData['qr_code_payload'] ?? null,
+                        ]);
+                    } else {
+                        // Store QR data in gateway_response if columns don't exist
+                        $paymentTransaction->update([
+                            'gateway_response' => array_merge(
+                                $paymentTransaction->gateway_response ?? [],
+                                [
+                                    'qr_code_url' => $qrData['qr_code_url'] ?? null,
+                                    'qr_code_payload' => $qrData['qr_code_payload'] ?? null,
+                                ]
+                            ),
+                        ]);
+                    }
+                } catch (\Exception $e) {
+                    // Fallback: Store in gateway_response
+                    $paymentTransaction->update([
+                        'gateway_response' => array_merge(
+                            $paymentTransaction->gateway_response ?? [],
+                            [
+                                'qr_code_url' => $qrData['qr_code_url'] ?? null,
+                                'qr_code_payload' => $qrData['qr_code_payload'] ?? null,
+                            ]
+                        ),
+                    ]);
+                }
             }
 
             $cart = Cart::where('cart_id', $request->cart_id)->first();

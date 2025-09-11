@@ -122,6 +122,7 @@ Route::prefix('')->group(function () {
         Route::get('/methods', [PaymentController::class, 'getPaymentMethods']);
         Route::get('/debug', [PaymentController::class, 'debugPaymentMethods']);
         Route::post('/initialize', [PaymentController::class, 'initializePaymentMethods']);
+        Route::post('/fix-schema', [PaymentController::class, 'fixPaymentTransactionsSchema']);
         Route::post('/{orderId}/create', [PaymentController::class, 'createPayment']);
         Route::get('/{transactionId}', [PaymentController::class, 'show']);
         Route::get('/{transactionId}/status', [PaymentController::class, 'checkPaymentStatus']);
