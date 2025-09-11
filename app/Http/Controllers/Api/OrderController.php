@@ -41,7 +41,8 @@ class OrderController extends Controller
         $validator = Validator::make($request->all(), [
             'cart_id' => 'required|exists:carts,cart_id',
             'customer_id' => 'required|exists:customers,customer_id',
-            'payment_method_id' => 'required|exists:payment_methods,payment_method_id',
+            'payment_method_id' => 'required_without:payment_method|exists:payment_methods,payment_method_id',
+            'payment_method' => 'required_without:payment_method_id|exists:payment_methods,code',
             'shipping_address' => 'nullable|string',
             'discount' => 'nullable|numeric|min:0|max:100'
         ]);
@@ -66,7 +67,13 @@ class OrderController extends Controller
                 return response()->json(['message' => 'Customer not found'], 404);
             }
 
-            $paymentMethod = PaymentMethod::find($request->payment_method_id);
+            // Handle both payment_method_id and payment_method (code) formats
+            if ($request->payment_method_id) {
+                $paymentMethod = PaymentMethod::find($request->payment_method_id);
+            } else {
+                $paymentMethod = PaymentMethod::where('code', $request->payment_method)->first();
+            }
+            
             if (!$paymentMethod || !$paymentMethod->is_active) {
                 return response()->json(['message' => 'Payment method not found or inactive'], 404);
             }
@@ -133,7 +140,7 @@ class OrderController extends Controller
             $paymentTransaction = PaymentTransaction::create([
                 'transaction_id' => 'PAY' . uniqid(),
                 'order_id' => $order->order_id,
-                'payment_method_id' => $request->payment_method_id,
+                'payment_method_id' => $paymentMethod->payment_method_id,
                 'amount' => $totalPrice,
                 'fee_amount' => $feeAmount,
                 'currency' => 'VND',
@@ -142,7 +149,7 @@ class OrderController extends Controller
             ]);
 
             // Generate QR code for payment
-            if (in_array($paymentMethod->code, ['momo', 'vnpay', 'bank_transfer'])) {
+            if (in_array($paymentMethod->code, ['momo', 'vnpay', 'zalopay', 'bank_transfer'])) {
                 $qrService = new QRPaymentService();
                 $qrData = $qrService->generateQRCode($paymentTransaction);
                 

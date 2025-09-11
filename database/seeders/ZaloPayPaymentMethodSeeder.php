@@ -16,7 +16,7 @@ class ZaloPayPaymentMethodSeeder extends Seeder
         
         if (!$zaloPayMethod) {
             PaymentMethod::create([
-                'payment_method_id' => 'PM' . uniqid(),
+                'payment_method_id' => 'PM005',
                 'name' => 'ZaloPay',
                 'code' => 'zalopay',
                 'type' => 'digital_wallet',
