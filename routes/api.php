@@ -116,6 +116,7 @@ Route::prefix('')->group(function () {
     Route::apiResource('orders', OrderController::class);
 
     Route::apiResource('order_details', OrderDetailController::class);
+    Route::get('/order-details/order/{order_id}', [OrderDetailController::class, 'getOrderDetails']);
 
     // Payment Routes
     Route::prefix('payments')->group(function () {
