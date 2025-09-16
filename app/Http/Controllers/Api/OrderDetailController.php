@@ -52,4 +52,32 @@ class OrderDetailController extends Controller
             ], 500);
         }
     }
+
+    // method GET Order Details by order_id
+    public function getOrderDetails($order_id)
+    {
+        try {
+            $order_details = OrderDetail::where('order_id', $order_id)->get();
+            if ($order_details->count() === 0) {
+                return response()->json([
+                    'message' => 'No order details found for this order',
+                    'order_id' => $order_id
+                ], 404);
+            }
+
+            return response()->json([
+                'data' => OrderDetailResource::collection($order_details)
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('Failed to get order details', [
+                'error' => $e->getMessage(),
+                'order_id' => $order_id
+            ]);
+
+            return response()->json([
+                'message' => 'Failed to get order details',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 }
