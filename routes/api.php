@@ -26,7 +26,7 @@ use App\Http\Controllers\Api\{
     CustomerStatisticController
 };
 
-Route::prefix('')->group(function () {
+Route::prefix('v1')->group(function () {
     // Store Routes Store and Store Settings
     Route::apiResource('stores', StoreController::class);
     Route::apiResource('store_settings', StoreSettingController::class);
