@@ -70,7 +70,7 @@ Route::prefix('v1')->group(function () {
     Route::middleware('api')->post('staffs/auth/login', [StaffController::class, 'authenticateLoginStaff']);
     Route::middleware('auth:sanctum')->post('staffs/auth/logout', [StaffController::class, 'logout']);
     Route::post('staffs/auth/refresh-token', [StaffController::class, 'refreshAccessToken']);
-    
+
     Route::apiResource('customers', CustomerController::class);
     Route::middleware('api')->post('customers/auth/login', [CustomerController::class, 'authenticateLoginCustomer']);
     Route::middleware('auth:sanctum')->post('customers/auth/logout', [CustomerController::class, 'logout']);
@@ -135,7 +135,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/momo/ipn', [PaymentController::class, 'handleCallback']);
         Route::post('/vnpay/callback', [PaymentController::class, 'handleCallback']);
         Route::post('/vnpay/ipn', [PaymentController::class, 'handleCallback']);
-        
+
         // ZaloPay Routes
         Route::post('/zalopay/create', [PaymentController::class, 'createZaloPayPayment']);
         Route::post('/zalopay/query', [PaymentController::class, 'queryZaloPayStatus']);
@@ -185,7 +185,7 @@ Route::prefix('v1')->group(function () {
     Route::apiResource('widget_no_reviews_settings', WidgetNoReviewSettingController::class);
 
     // Statistics Routes
-    
+
     // Product Statistics Routes
     Route::prefix('product-statistics')->group(function () {
         Route::get('/product/{product_id}', [ProductStatisticController::class, 'getByProductId']);

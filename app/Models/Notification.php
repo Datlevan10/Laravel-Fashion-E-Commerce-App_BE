@@ -21,6 +21,7 @@ class Notification extends Model
         'customer_id',
         'type',
         'related_id',
+        'product_id',
         'message',
         'is_read',
     ];
