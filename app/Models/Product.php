@@ -21,12 +21,14 @@ class Product extends Model
         'color' => 'array',
         'size' => 'array',
         'image' => 'array',
+        'variant' => 'array',
     ];
 
     protected $fillable = [
         'category_id',
         'product_name',
         'description',
+        'variant',
         'color',
         'size',
         'image',
@@ -53,7 +55,8 @@ class Product extends Model
                 'notification_id' => Str::random(8),
                 'type' => 'products',
                 'related_id' => $product->product_id,
-                'message' => "{$storeName} just added a new product with category {$categoryName}. You can see the product '{$product->product_name}'. And shop now.",
+                'product_id' => $product->product_id,
+                'message' => "{$storeName} vừa thêm sản phẩm mới vào danh mục. {$categoryName}. Bạn có thể xem sản phẩm '{$product->product_name}'. Mua sắm ngay!.",
                 'is_read' => false,
                 'created_at' => now(),
                 'updated_at' => now(),
