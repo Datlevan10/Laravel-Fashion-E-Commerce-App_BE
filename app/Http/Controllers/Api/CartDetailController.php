@@ -73,8 +73,9 @@ class CartDetailController extends Controller
             } else {
                 return response()->json([
                     'message' => 'No unchecked cart details found for this customer',
-                    'customer_id' => $customer_id
-                ], 404);
+                    'customer_id' => $customer_id,
+                    'data' => []
+                ], 200);
             }
         } catch (\Exception $e) {
             Log::error('Failed to get unchecked cart details for customer', [
