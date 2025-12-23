@@ -64,7 +64,11 @@ class CartController extends Controller
             ->first();
 
         if (!$cart) {
-            return response()->json(['message' => 'Cart not found for this customer'], 404);
+            return response()->json([
+                'message' => 'No active cart found for this customer',
+                'customer_id' => $customer_id,
+                'data' => null
+            ], 200);
         }
 
         return response()->json([

@@ -84,7 +84,7 @@ class PaymentMethodSeeder extends Seeder
                 'transaction_fee_percentage' => 0,
                 'transaction_fee_fixed' => 15000,
                 'minimum_amount' => 0,
-                'maximum_amount' => 5000000,
+                'maximum_amount' => 500000000,
                 'api_config' => null,
                 'supported_currencies' => ['VND'],
                 'description' => 'Pay when receiving goods',
