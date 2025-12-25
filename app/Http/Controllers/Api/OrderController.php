@@ -18,6 +18,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\OrderResource;
 use App\Http\Resources\PaymentTransactionResource;
 use App\Services\QRPaymentService;
+use App\Services\ZaloPayService;
 use Illuminate\Support\Facades\Validator;
 
 class OrderController extends Controller
@@ -149,8 +150,32 @@ class OrderController extends Controller
                 'reference_number' => $order->order_id,
             ]);
 
-            // Generate QR code for payment
-            if (in_array($paymentMethod->code, ['momo', 'vnpay', 'zalopay', 'bank_transfer'])) {
+            // Handle payment method specific logic
+            if ($paymentMethod->code === 'zalopay') {
+                // For ZaloPay, immediately create the payment and get the order_url
+                $zaloPayService = new ZaloPayService();
+                $paymentResult = $zaloPayService->createPayment($order, "Payment for order {$order->order_id}");
+                
+                if ($paymentResult['success'] && isset($paymentResult['order_url'])) {
+                    // Update payment transaction with ZaloPay response
+                    $paymentTransaction->update([
+                        'gateway_response' => $paymentResult,
+                        'gateway_transaction_id' => $paymentResult['app_trans_id'] ?? null,
+                        'reference_number' => $paymentResult['app_trans_id'] ?? $order->order_id,
+                        'qr_code_url' => null, // Remove generic QR for ZaloPay
+                    ]);
+                    
+                    // Reload to get updated data
+                    $paymentTransaction->refresh();
+                } else {
+                    // Log error but don't fail the order creation
+                    Log::warning('Failed to create ZaloPay payment URL', [
+                        'order_id' => $order->order_id,
+                        'error' => $paymentResult['message'] ?? 'Unknown error'
+                    ]);
+                }
+            } elseif (in_array($paymentMethod->code, ['momo', 'vnpay', 'bank_transfer'])) {
+                // For other payment methods, generate generic QR code
                 $qrService = new QRPaymentService();
                 $qrData = $qrService->generateQRCode($paymentTransaction);
                 

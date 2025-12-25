@@ -43,14 +43,20 @@ class ZaloPayService
                 ->first();
                 
             if ($existingTransaction) {
-                // Return existing transaction with order URL
-                return [
-                    'success' => true,
-                    'transaction_id' => $existingTransaction->transaction_id,
-                    'order_url' => $existingTransaction->gateway_response['order_url'] ?? null,
-                    'app_trans_id' => $existingTransaction->reference_number,
-                    'message' => 'Using existing pending transaction'
-                ];
+                // Check if we already have a valid order_url
+                $existingOrderUrl = $existingTransaction->gateway_response['order_url'] ?? null;
+                if ($existingOrderUrl) {
+                    // Return existing transaction with order URL
+                    return [
+                        'success' => true,
+                        'transaction_id' => $existingTransaction->transaction_id,
+                        'order_url' => $existingOrderUrl,
+                        'app_trans_id' => $existingTransaction->gateway_response['app_trans_id'] ?? $existingTransaction->reference_number,
+                        'zp_trans_token' => $existingTransaction->gateway_response['zp_trans_token'] ?? null,
+                        'message' => 'Using existing pending transaction'
+                    ];
+                }
+                // If no order_url exists, continue to create new payment
             }
             
             // Build ZaloPay request payload
