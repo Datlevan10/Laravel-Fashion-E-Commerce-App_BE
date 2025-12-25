@@ -634,10 +634,15 @@ class PaymentController extends Controller
         DB::beginTransaction();
 
         try {
-            // Find order
-            $order = Order::where('order_id', $request->order_id)->first();
+            // Find order - use find() which works with string primary keys
+            $order = Order::find($request->order_id);
             if (!$order) {
-                return response()->json(['message' => 'Order not found'], 404);
+                // Try with where clause as fallback
+                $order = Order::where('order_id', $request->order_id)->first();
+                if (!$order) {
+                    DB::rollBack();
+                    return response()->json(['message' => 'Order not found'], 404);
+                }
             }
             
             // Use order total_price if amount not provided
@@ -649,7 +654,25 @@ class PaymentController extends Controller
             $result = $this->zaloPayService->createPayment($order, $request->description);
             
             if (!$result['success']) {
+                DB::rollBack();
                 throw new \Exception($result['message'] ?? 'Failed to create ZaloPay payment');
+            }
+            
+            // If we got existing transaction without URL, delete it and create new one
+            if (empty($result['order_url']) && isset($result['message']) && strpos($result['message'], 'existing') !== false) {
+                // Delete existing pending transaction
+                PaymentTransaction::where('order_id', $order->order_id)
+                    ->where('payment_method_id', 'PM005')
+                    ->whereIn('status', ['pending'])
+                    ->delete();
+                    
+                // Try again
+                $result = $this->zaloPayService->createPayment($order, $request->description);
+                
+                if (!$result['success']) {
+                    DB::rollBack();
+                    throw new \Exception($result['message'] ?? 'Failed to create ZaloPay payment');
+                }
             }
             
             DB::commit();

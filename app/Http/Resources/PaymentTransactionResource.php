@@ -27,6 +27,11 @@ class PaymentTransactionResource extends JsonResource
             'reference_number' => $this->reference_number,
             'gateway_transaction_id' => $this->gateway_transaction_id,
             'gateway_response' => $this->gateway_response,
+            
+            // ZaloPay specific fields (only included if present)
+            'order_url' => $this->order_url ?? ($this->gateway_response['order_url'] ?? null),
+            'app_trans_id' => $this->app_trans_id ?? ($this->gateway_response['app_trans_id'] ?? null),
+            'zp_trans_token' => $this->zp_trans_token ?? ($this->gateway_response['zp_trans_token'] ?? null),
             'processed_at' => $this->processed_at?->format('Y-m-d H:i:s'),
             'failure_reason' => $this->failure_reason,
             'created_at' => $this->created_at?->format('Y-m-d H:i:s'),
