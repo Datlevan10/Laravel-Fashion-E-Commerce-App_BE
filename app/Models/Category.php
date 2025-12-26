@@ -30,4 +30,9 @@ class Category extends Model
             $category->category_id = Str::random(8);
         });
     }
+
+    public function getRouteKeyName()
+    {
+        return 'category_id';
+    }
 }

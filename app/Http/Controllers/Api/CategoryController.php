@@ -111,10 +111,18 @@ class CategoryController extends Controller
     // method PUT
     public function update(Request $request, Category $category)
     {
+
         // Debug: Log incoming request data
         Log::info('Category Update Request', [
             'category_id' => $category->category_id,
+            'method' => $request->method(),
             'request_data' => $request->all(),
+            'has_file' => $request->hasFile('image_category'),
+            'file_info' => $request->hasFile('image_category') ? [
+                'name' => $request->file('image_category')->getClientOriginalName(),
+                'size' => $request->file('image_category')->getSize(),
+                'mime' => $request->file('image_category')->getMimeType(),
+            ] : null,
             'has_category_name' => $request->has('category_name'),
             'has_description' => $request->has('description'),
             'category_name_value' => $request->category_name,

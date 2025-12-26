@@ -14,6 +14,72 @@ use Illuminate\Support\Facades\Validator;
 
 class ProductController extends Controller
 {
+    // Test upload endpoint for debugging
+    public function testUpload(Request $request)
+    {
+        $allFiles = $request->allFiles();
+        $allData = $request->all();
+        
+        $fileInfo = [];
+        foreach ($allFiles as $key => $file) {
+            if (is_array($file)) {
+                foreach ($file as $index => $f) {
+                    try {
+                        $fileInfo[$key][$index] = [
+                            'valid' => $f->isValid(),
+                            'size' => $f->getSize(),
+                            'error' => $f->getError(),
+                            'error_message' => $f->getErrorMessage(),
+                            'original_name' => $f->getClientOriginalName(),
+                            'mime' => $f->isValid() ? $f->getMimeType() : 'invalid',
+                            'path' => $f->getPathname(),
+                            'real_path' => $f->getRealPath(),
+                        ];
+                    } catch (\Exception $e) {
+                        $fileInfo[$key][$index] = [
+                            'error' => 'Exception: ' . $e->getMessage(),
+                            'valid' => false,
+                        ];
+                    }
+                }
+            } else {
+                try {
+                    $fileInfo[$key] = [
+                        'valid' => $file->isValid(),
+                        'size' => $file->getSize(),
+                        'error' => $file->getError(),
+                        'error_message' => $file->getErrorMessage(),
+                        'original_name' => $file->getClientOriginalName(),
+                        'mime' => $file->isValid() ? $file->getMimeType() : 'invalid',
+                        'path' => $file->getPathname(),
+                        'real_path' => $file->getRealPath(),
+                    ];
+                } catch (\Exception $e) {
+                    $fileInfo[$key] = [
+                        'error' => 'Exception: ' . $e->getMessage(),
+                        'valid' => false,
+                    ];
+                }
+            }
+        }
+        
+        // Log the raw request data
+        Log::info('Test upload raw data', [
+            'files' => $fileInfo,
+            'data' => $allData,
+            'headers' => $request->headers->all(),
+        ]);
+        
+        return response()->json([
+            'message' => 'Upload test',
+            'files_received' => array_keys($allFiles),
+            'file_details' => $fileInfo,
+            'has_image' => $request->hasFile('image'),
+            'request_data_keys' => array_keys($allData),
+            'content_type' => $request->header('Content-Type'),
+        ]);
+    }
+    
     // method GET
     public function index()
     {
@@ -84,6 +150,43 @@ class ProductController extends Controller
     // method POST
     public function store(Request $request)
     {
+        // Handle different image field formats (image.0, image.1 or image[])
+        $imageFiles = [];
+        $allFiles = $request->allFiles();
+        
+        // Debug logging
+        Log::info('Product creation - File upload debug', [
+            'all_files_keys' => array_keys($allFiles),
+            'has_image' => $request->hasFile('image'),
+            'request_method' => $request->method(),
+            'content_type' => $request->header('Content-Type'),
+        ]);
+        
+        // Check for image array format (image[])
+        if ($request->hasFile('image')) {
+            $imageFiles = $request->file('image');
+            if (!is_array($imageFiles)) {
+                $imageFiles = [$imageFiles];
+            }
+        } 
+        // Check for dot notation format (image.0, image.1, etc.) or underscore format (image_0, image_1, etc.)
+        else {
+            foreach ($allFiles as $key => $file) {
+                if (strpos($key, 'image.') === 0 || strpos($key, 'image_') === 0) {
+                    $imageFiles[] = $file;
+                }
+            }
+        }
+        
+        // If we found images in dot notation, set them properly for validation
+        if (!empty($imageFiles) && !$request->hasFile('image')) {
+            $request->merge(['image' => $imageFiles]);
+            // Create a new FileBag with the image files
+            $files = $request->files->all();
+            $files['image'] = $imageFiles;
+            $request->files->replace($files);
+        }
+
         $validator = Validator::make($request->all(), [
             'category_id' => 'required|exists:categories,category_id',
             'product_name' => 'required|string|max:255',
@@ -105,6 +208,7 @@ class ProductController extends Controller
             Log::error('Validation failed', [
                 'errors' => $validator->messages(),
                 'request' => $request->all(),
+                'files' => array_keys($allFiles),
             ]);
 
             return response()->json([
@@ -114,15 +218,13 @@ class ProductController extends Controller
         }
 
         $imagePaths = [];
-        if ($request->hasFile('image')) {
-            foreach ($request->file('image') as $image) {
-                $originalName = $image->getClientOriginalName();
-                // Sanitize filename: replace spaces and special characters
-                $safeName = preg_replace('/[^a-zA-Z0-9._-]/', '_', $originalName);
-                $imageName = time() . '_' . $safeName;
-                $imagePath = $image->storeAs('products', $imageName, 'public');
-                $imagePaths[] = Storage::url($imagePath);
-            }
+        foreach ($imageFiles as $image) {
+            $originalName = $image->getClientOriginalName();
+            // Sanitize filename: replace spaces and special characters
+            $safeName = preg_replace('/[^a-zA-Z0-9._-]/', '_', $originalName);
+            $imageName = time() . '_' . rand(1000, 9999) . '_' . $safeName;
+            $imagePath = $image->storeAs('products', $imageName, 'public');
+            $imagePaths[] = Storage::url($imagePath);
         }
 
         $product = Product::create([
@@ -179,6 +281,35 @@ class ProductController extends Controller
     // method PUT
     public function update(Request $request, Product $product)
     {
+        // Handle different image field formats (image.0, image.1 or image[])
+        $imageFiles = [];
+        $allFiles = $request->allFiles();
+        
+        // Check for image array format (image[])
+        if ($request->hasFile('image')) {
+            $imageFiles = $request->file('image');
+            if (!is_array($imageFiles)) {
+                $imageFiles = [$imageFiles];
+            }
+        } 
+        // Check for dot notation format (image.0, image.1, etc.) or underscore format (image_0, image_1, etc.)
+        else {
+            foreach ($allFiles as $key => $file) {
+                if (strpos($key, 'image.') === 0 || strpos($key, 'image_') === 0) {
+                    $imageFiles[] = $file;
+                }
+            }
+        }
+        
+        // If we found images in dot notation, set them properly for validation
+        if (!empty($imageFiles) && !$request->hasFile('image')) {
+            $request->merge(['image' => $imageFiles]);
+            // Create a new FileBag with the image files
+            $files = $request->files->all();
+            $files['image'] = $imageFiles;
+            $request->files->replace($files);
+        }
+
         $validator = Validator::make($request->all(), [
             'category_id' => 'sometimes|exists:categories,category_id',
             'product_name' => 'sometimes|string|max:255',
@@ -200,6 +331,7 @@ class ProductController extends Controller
             Log::error('Validation failed', [
                 'errors' => $validator->messages(),
                 'request' => $request->all(),
+                'files' => array_keys($allFiles),
             ]);
 
             return response()->json([
@@ -209,15 +341,15 @@ class ProductController extends Controller
         }
 
         $imagePaths = $product->image;
-        if ($request->hasFile('image')) {
+        if (!empty($imageFiles)) {
             $imagePaths = [];
-            foreach ($request->file('image') as $image) {
+            foreach ($imageFiles as $image) {
                 $originalName = $image->getClientOriginalName();
                 // Sanitize filename: replace spaces and special characters
                 $safeName = preg_replace('/[^a-zA-Z0-9._-]/', '_', $originalName);
-                $imageName = time() . '_' . $safeName;
+                $imageName = time() . '_' . rand(1000, 9999) . '_' . $safeName;
                 $imagePath = $image->storeAs('products', $imageName, 'public');
-                $imagePaths[] = Storage::url($imagePath);
+                $imagePaths[] = ['url' => Storage::url($imagePath)];
             }
         }
 
