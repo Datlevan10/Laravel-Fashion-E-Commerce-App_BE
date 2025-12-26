@@ -26,6 +26,7 @@ class ProductResource extends JsonResource
             'image' => $this->formatImageUrls($this->image),
             'old_price' => $this->old_price,
             'new_price' => $this->new_price,
+            'quantity_in_stock' => $this->quantity_in_stock,
             'total_review' => $this->total_review,
             'average_review' => $this->average_review,
             'note' => $this->note,
