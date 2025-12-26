@@ -43,6 +43,8 @@ class OrderController extends Controller
         $validator = Validator::make($request->all(), [
             'cart_id' => 'required|exists:carts,cart_id',
             'customer_id' => 'required|exists:customers,customer_id',
+            'cart_detail_ids' => 'nullable|array',
+            'cart_detail_ids.*' => 'exists:cart_details,cart_detail_id',
             'payment_method_id' => 'required_without:payment_method|exists:payment_methods,payment_method_id',
             'payment_method' => 'required_without:payment_method_id|exists:payment_methods,code',
             'shipping_address' => 'nullable|string',
@@ -80,9 +82,26 @@ class OrderController extends Controller
                 return response()->json(['message' => 'Payment method not found or inactive'], 404);
             }
 
-            $cartDetails = CartDetail::where('cart_id', $request->cart_id)
-                ->where('is_checked_out', false)
-                ->get();
+            // If specific cart_detail_ids are provided, use only those items
+            // Otherwise, use all items in the cart that haven't been checked out
+            if (!empty($request->cart_detail_ids)) {
+                $cartDetails = CartDetail::whereIn('cart_detail_id', $request->cart_detail_ids)
+                    ->where('cart_id', $request->cart_id)
+                    ->where('is_checked_out', false)
+                    ->get();
+                
+                // Validate that all requested cart_detail_ids belong to the specified cart
+                if ($cartDetails->count() !== count($request->cart_detail_ids)) {
+                    return response()->json([
+                        'message' => 'Some cart items are invalid or already checked out'
+                    ], 400);
+                }
+            } else {
+                // Default behavior: use all items in the cart
+                $cartDetails = CartDetail::where('cart_id', $request->cart_id)
+                    ->where('is_checked_out', false)
+                    ->get();
+            }
 
             if ($cartDetails->isEmpty()) {
                 return response()->json(['message' => 'No items in cart to checkout'], 400);
@@ -625,13 +644,23 @@ class OrderController extends Controller
             }
 
             // Record refund information
+            $processedBy = 'system';
+            try {
+                if ($request->user()) {
+                    $processedBy = $request->user()->id;
+                }
+            } catch (\Exception $e) {
+                // If auth is not available, use 'system'
+                $processedBy = 'system';
+            }
+            
             $refundInfo = json_encode([
                 'refund_id' => 'REF' . uniqid(),
                 'amount' => $request->refund_amount,
                 'reason' => $request->refund_reason,
                 'method' => $request->refund_method,
                 'processed_at' => Carbon::now()->toIso8601String(),
-                'processed_by' => auth()->user()->id ?? 'system'
+                'processed_by' => $processedBy
             ]);
 
             $order->update([
