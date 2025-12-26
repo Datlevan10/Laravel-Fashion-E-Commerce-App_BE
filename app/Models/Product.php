@@ -35,6 +35,7 @@ class Product extends Model
         'old_price',
         'new_price',
         'note',
+        'quantity_in_stock',
         'rating_count',
         'rating_average',
     ];
@@ -62,6 +63,11 @@ class Product extends Model
                 'updated_at' => now(),
             ]);
         });
+    }
+
+    public function getRouteKeyName()
+    {
+        return 'product_id';
     }
 
     public function category()

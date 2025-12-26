@@ -202,6 +202,7 @@ class ProductController extends Controller
             'old_price' => 'nullable|numeric|min:0',
             'new_price' => 'required|numeric|min:0',
             'note' => 'nullable|string|max:255',
+            'quantity_in_stock' => 'nullable|integer|min:0',
         ]);
 
         if ($validator->fails()) {
@@ -239,6 +240,7 @@ class ProductController extends Controller
             'old_price' => $request->old_price,
             'new_price' => $request->new_price ?? $request->old_price,
             'note' => $request->note,
+            'quantity_in_stock' => $request->quantity_in_stock,
             'total_review' => 0,
             'average_review' => 0,
         ]);
@@ -325,6 +327,7 @@ class ProductController extends Controller
             'old_price' => 'sometimes|numeric|min:0',
             'new_price' => 'sometimes|numeric|min:0',
             'note' => 'nullable|string|max:255',
+            'quantity_in_stock' => 'nullable|integer|min:0',
         ]);
 
         if ($validator->fails()) {
@@ -364,6 +367,7 @@ class ProductController extends Controller
             'old_price' => $request->old_price ?? $product->old_price,
             'new_price' => $request->new_price ?? $product->new_price,
             'note' => $request->note ?? $product->note,
+            'quantity_in_stock' => $request->has('quantity_in_stock') ? $request->quantity_in_stock : $product->quantity_in_stock,
         ]);
 
         return response()->json([
