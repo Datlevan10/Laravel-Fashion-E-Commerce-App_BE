@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use Carbon\Carbon;
 use App\Models\Cart;
 use App\Models\Order;
+use App\Models\Product;
 use App\Models\Customer;
 use App\Models\CartDetail;
 use App\Models\OrderDetail;
@@ -360,7 +361,16 @@ class OrderController extends Controller
                 'notes' => 'Order cancelled at ' . Carbon::now()->format('Y-m-d H:i:s')
             ]);
 
-            // TODO: Implement inventory restoration if needed
+            // Restore inventory for cancelled order
+            $orderDetails = OrderDetail::where('order_id', $order_id)->get();
+            foreach ($orderDetails as $detail) {
+                $product = Product::find($detail->product_id);
+                if ($product && $product->quantity_in_stock !== null) {
+                    $product->quantity_in_stock += $detail->quantity;
+                    $product->save();
+                }
+            }
+            
             // TODO: Implement refund process if payment was made
 
             DB::commit();
