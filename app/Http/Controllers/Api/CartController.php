@@ -99,6 +99,15 @@ class CartController extends Controller
         $size = $request->input('size');
 
         $product = Product::findOrFail($product_id);
+        
+        // Check if product has sufficient stock
+        if ($product->quantity_in_stock !== null && $product->quantity_in_stock < $quantity) {
+            return response()->json([
+                'message' => 'Insufficient stock available',
+                'available_quantity' => $product->quantity_in_stock,
+                'requested_quantity' => $quantity
+            ], 400);
+        }
 
         $cart = Cart::where('customer_id', $customer_id)
             ->where('cart_status', false)
@@ -120,7 +129,19 @@ class CartController extends Controller
             ->first();
 
         if ($cartDetail) {
-            $cartDetail->quantity += $quantity;
+            $newQuantity = $cartDetail->quantity + $quantity;
+            
+            // Check if the new total quantity exceeds available stock
+            if ($product->quantity_in_stock !== null && $product->quantity_in_stock < $newQuantity) {
+                return response()->json([
+                    'message' => 'Adding this quantity would exceed available stock',
+                    'available_quantity' => $product->quantity_in_stock,
+                    'current_cart_quantity' => $cartDetail->quantity,
+                    'requested_additional_quantity' => $quantity
+                ], 400);
+            }
+            
+            $cartDetail->quantity = $newQuantity;
             $cartDetail->total_price = $cartDetail->quantity * $product->new_price;
             $cartDetail->save();
         } else {

@@ -172,6 +172,17 @@ class CartDetailController extends Controller
 
             // Update quantity and recalculate total_price
             $newQuantity = $request->input('quantity');
+            
+            // Check if product has sufficient stock for the new quantity
+            $product = \App\Models\Product::find($cartDetail->product_id);
+            if ($product && $product->quantity_in_stock !== null && $product->quantity_in_stock < $newQuantity) {
+                return response()->json([
+                    'message' => 'Insufficient stock available',
+                    'available_quantity' => $product->quantity_in_stock,
+                    'requested_quantity' => $newQuantity
+                ], 400);
+            }
+            
             $cartDetail->quantity = $newQuantity;
             $cartDetail->total_price = $cartDetail->unit_price * $newQuantity;
             $cartDetail->save();

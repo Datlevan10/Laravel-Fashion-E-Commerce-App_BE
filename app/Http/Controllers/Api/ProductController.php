@@ -280,6 +280,16 @@ class ProductController extends Controller
         }
     }
 
+    // Special method for updating products with images using POST (for multipart/form-data support)
+    public function updateWithImages(Request $request, Product $product)
+    {
+        // This method handles PUT/PATCH requests sent as POST with _method field
+        // This is necessary because Laravel doesn't handle file uploads well with PUT/PATCH
+        
+        // Call the regular update method
+        return $this->update($request, $product);
+    }
+    
     // method PUT
     public function update(Request $request, Product $product)
     {

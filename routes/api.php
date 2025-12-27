@@ -50,6 +50,8 @@ Route::prefix('v1')->group(function () {
 
     Route::prefix('products')->group(function () {
         Route::post('/test-upload', [ProductController::class, 'testUpload']);
+        // Special POST route for updating products with images (supports multipart/form-data)
+        Route::post('/{product}/update', [ProductController::class, 'updateWithImages']);
         Route::get('/search', [ProductController::class, 'searchProducts']);
         Route::get('filter-by-stars', [ProductController::class, 'filterProductsByStars']);
         Route::get('filter-by-sizes', [ProductController::class, 'filterProductsBySizes']);
