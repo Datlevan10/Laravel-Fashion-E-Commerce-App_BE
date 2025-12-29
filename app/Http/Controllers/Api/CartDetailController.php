@@ -177,10 +177,13 @@ class CartDetailController extends Controller
             $product = \App\Models\Product::find($cartDetail->product_id);
             if ($product && $product->quantity_in_stock !== null && $product->quantity_in_stock < $newQuantity) {
                 return response()->json([
-                    'message' => 'Insufficient stock available',
+                    'message' => 'Đã vượt quá giới hạn tồn kho. Số lượng vượt quá lượng hàng có sẵn.',
                     'available_quantity' => $product->quantity_in_stock,
-                    'requested_quantity' => $newQuantity
-                ], 400);
+                    'requested_quantity' => $newQuantity,
+                    'stock_exceeded' => true,
+                    'data' => new CartDetailResource($cartDetail),
+                    'cart_total' => CartDetail::where('cart_id', $cartDetail->cart_id)->sum('total_price')
+                ], 200);
             }
             
             $cartDetail->quantity = $newQuantity;
