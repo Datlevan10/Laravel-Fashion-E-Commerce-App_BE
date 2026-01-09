@@ -112,6 +112,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/customer/{customer_id}', [OrderController::class, 'getOrdersByCustomer']);
         Route::get('/status/{status}', [OrderController::class, 'getOrdersByStatus']);
         Route::get('/history', [OrderController::class, 'getOrderHistory']);
+        Route::get('/revenue', [OrderController::class, 'calculateRevenue']);
         Route::put('/{order_id}/shipping-address', [OrderController::class, 'updateShippingAddress']);
         Route::put('/{order_id}/tracking', [OrderController::class, 'addTracking']);
         Route::post('/{order_id}/refund', [OrderController::class, 'processRefund']);

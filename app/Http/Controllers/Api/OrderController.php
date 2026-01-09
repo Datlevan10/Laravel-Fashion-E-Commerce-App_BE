@@ -712,4 +712,94 @@ class OrderController extends Controller
 
         return in_array($newStatus, $validTransitions[$currentStatus] ?? []);
     }
+
+    /**
+     * Calculate revenue from actual orders
+     * GET /api/v1/orders/revenue
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function calculateRevenue(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date|after_or_equal:start_date',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $validator->messages(),
+            ], 422);
+        }
+
+        try {
+            // Build the query for orders with eligible statuses
+            $query = Order::whereIn('order_status', ['confirmed', 'shipped', 'delivered']);
+
+            // Apply date filters if provided
+            if ($request->start_date) {
+                $query->where('order_date', '>=', $request->start_date);
+            }
+
+            if ($request->end_date) {
+                $query->where('order_date', '<=', $request->end_date);
+            }
+
+            // Join with payment_transactions to ensure only completed payments are counted
+            $query->whereHas('paymentTransactions', function ($q) {
+                $q->where('status', 'completed');
+            });
+
+            // Calculate revenue metrics
+            $totalRevenue = $query->sum('total_price');
+            $orderCount = $query->count();
+            $averageOrderValue = $orderCount > 0 ? $totalRevenue / $orderCount : 0;
+
+            // Get additional statistics
+            $ordersByStatus = Order::select('order_status', DB::raw('COUNT(*) as count'), DB::raw('SUM(total_price) as revenue'))
+                ->whereIn('order_status', ['confirmed', 'shipped', 'delivered'])
+                ->whereHas('paymentTransactions', function ($q) {
+                    $q->where('status', 'completed');
+                });
+
+            if ($request->start_date) {
+                $ordersByStatus->where('order_date', '>=', $request->start_date);
+            }
+
+            if ($request->end_date) {
+                $ordersByStatus->where('order_date', '<=', $request->end_date);
+            }
+
+            $ordersByStatus = $ordersByStatus->groupBy('order_status')->get();
+
+            // Calculate date range for display
+            $dateRange = [
+                'start_date' => $request->start_date ?? Order::min('order_date'),
+                'end_date' => $request->end_date ?? Order::max('order_date'),
+            ];
+
+            return response()->json([
+                'message' => 'Revenue calculated successfully',
+                'data' => [
+                    'total_revenue' => round($totalRevenue, 2),
+                    'total_orders' => $orderCount,
+                    'average_order_value' => round($averageOrderValue, 2),
+                    'revenue_by_status' => $ordersByStatus,
+                    'date_range' => $dateRange,
+                    'currency' => 'VND'
+                ]
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('Failed to calculate revenue', [
+                'error' => $e->getMessage(),
+                'request' => $request->all(),
+            ]);
+            return response()->json([
+                'message' => 'Failed to calculate revenue',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 }
