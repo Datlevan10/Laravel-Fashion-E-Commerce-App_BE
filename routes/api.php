@@ -4,6 +4,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\{
     AdminController,
+    AdminReportsController,
     CartController,
     CartDetailController,
     ProductController,
@@ -229,6 +230,14 @@ Route::prefix('v1')->group(function () {
     Route::prefix('admin')->group(function () {
         Route::get('/orders/recent', [AdminController::class, 'getRecentOrders']);
         Route::get('/products/top-selling', [AdminController::class, 'getTopSellingProducts']);
+        
+        // Admin Reports Routes
+        Route::prefix('reports')->group(function () {
+            Route::get('/dashboard', [AdminReportsController::class, 'dashboard']);
+            Route::get('/products', [AdminReportsController::class, 'products']);
+            Route::get('/customers', [AdminReportsController::class, 'customers']);
+            Route::get('/sales-trend', [AdminReportsController::class, 'salesTrend']);
+        });
     });
 
     // Authenticated User Route
