@@ -7,6 +7,9 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Support\Str;
+use App\Models\Order;
+use App\Models\Cart;
+use App\Models\Notification;
 
 class Customer extends Model
 {
@@ -47,5 +50,20 @@ class Customer extends Model
     {
         $this->last_login = now();
         $this->save();
+    }
+
+    public function orders()
+    {
+        return $this->hasMany(Order::class, 'customer_id', 'customer_id');
+    }
+
+    public function carts()
+    {
+        return $this->hasMany(Cart::class, 'customer_id', 'customer_id');
+    }
+
+    public function notifications()
+    {
+        return $this->hasMany(Notification::class, 'customer_id', 'customer_id');
     }
 }
