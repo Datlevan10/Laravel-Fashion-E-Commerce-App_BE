@@ -278,18 +278,17 @@ class AdminReportsController extends Controller
             // Get top customers by revenue
             $query = Customer::select(
                 'customers.customer_id',
-                'customers.customer_name',
+                'customers.full_name as customer_name',
                 'customers.email',
-                DB::raw('COUNT(orders.order_id) as total_orders'),
+                DB::raw('COUNT(DISTINCT orders.order_id) as total_orders'),
                 DB::raw('SUM(orders.total_price) as total_spent'),
                 DB::raw('AVG(orders.total_price) as avg_order_value'),
                 DB::raw('MAX(orders.order_date) as last_order_date')
             )
             ->join('orders', 'customers.customer_id', '=', 'orders.customer_id')
+            ->join('payment_transactions', 'orders.order_id', '=', 'payment_transactions.order_id')
             ->whereIn('orders.order_status', ['confirmed', 'shipped', 'delivered'])
-            ->whereHas('orders.paymentTransactions', function ($q) {
-                $q->where('status', 'completed');
-            });
+            ->where('payment_transactions.status', 'completed');
 
             if ($startDate) {
                 $query->where('orders.order_date', '>=', $startDate);
@@ -299,23 +298,27 @@ class AdminReportsController extends Controller
             }
 
             $topCustomers = $query
-                ->groupBy('customers.customer_id', 'customers.customer_name', 'customers.email')
+                ->groupBy('customers.customer_id', 'customers.full_name', 'customers.email')
                 ->orderBy('total_spent', 'desc')
                 ->limit($limit)
                 ->get();
 
             // Get new vs returning customers
-            $newCustomersCount = Customer::query();
-            $returningCustomersCount = Customer::whereHas('orders', function ($q) {
-                $q->havingRaw('COUNT(*) > 1');
-            });
-
+            $newCustomersQuery = Customer::query();
             if ($startDate) {
-                $newCustomersCount->where('created_at', '>=', $startDate);
+                $newCustomersQuery->where('created_at', '>=', $startDate);
             }
             if ($endDate) {
-                $newCustomersCount->where('created_at', '<=', $endDate);
+                $newCustomersQuery->where('created_at', '<=', $endDate);
             }
+            $newCustomersCount = $newCustomersQuery->count();
+
+            // Count customers with more than one order
+            $returningCustomersCount = Customer::select('customers.customer_id')
+                ->join('orders', 'customers.customer_id', '=', 'orders.customer_id')
+                ->groupBy('customers.customer_id')
+                ->havingRaw('COUNT(orders.order_id) > 1')
+                ->count();
 
             return response()->json([
                 'message' => 'Customer reports retrieved successfully',
@@ -333,8 +336,8 @@ class AdminReportsController extends Controller
                     }),
                     'summary' => [
                         'total_customers' => Customer::count(),
-                        'new_customers' => $newCustomersCount->count(),
-                        'returning_customers' => $returningCustomersCount->count(),
+                        'new_customers' => $newCustomersCount,
+                        'returning_customers' => $returningCustomersCount,
                     ],
                     'parameters' => [
                         'start_date' => $startDate,
@@ -380,15 +383,16 @@ class AdminReportsController extends Controller
             $endDate = $request->end_date ?? Carbon::now()->format('Y-m-d');
             $groupBy = $request->group_by ?? 'day';
 
+            // Use database-agnostic date formatting
             $dateFormat = match($groupBy) {
-                'month' => '%Y-%m',
-                'week' => '%Y-%u',
-                'day' => '%Y-%m-%d',
-                default => '%Y-%m-%d'
+                'month' => "to_char(order_date, 'YYYY-MM')",
+                'week' => "to_char(order_date, 'YYYY-IW')",
+                'day' => "to_char(order_date, 'YYYY-MM-DD')",
+                default => "to_char(order_date, 'YYYY-MM-DD')"
             };
 
             $salesData = Order::select(
-                DB::raw("DATE_FORMAT(order_date, '{$dateFormat}') as period"),
+                DB::raw("{$dateFormat} as period"),
                 DB::raw('COUNT(*) as order_count'),
                 DB::raw('SUM(total_price) as revenue'),
                 DB::raw('AVG(total_price) as avg_order_value')

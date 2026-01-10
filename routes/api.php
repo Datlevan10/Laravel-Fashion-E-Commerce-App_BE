@@ -237,6 +237,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/products', [AdminReportsController::class, 'products']);
             Route::get('/customers', [AdminReportsController::class, 'customers']);
             Route::get('/sales-trend', [AdminReportsController::class, 'salesTrend']);
+            Route::get('/sales', [AdminReportsController::class, 'salesTrend']); // Alias for frontend compatibility
         });
     });
 
