@@ -26,17 +26,18 @@ class OrderController extends Controller
 {
     // method GET
     public function index()
-    {
-        $orders = Order::get();
-        if ($orders->count() > 0) {
-            return response()->json([
-                'message' => 'Get order success',
-                'data' => OrderResource::collection($orders)
-            ], 200);
-        } else {
-            return response()->json(['message' => 'No record available'], 200);
-        }
+{
+    $orders = Order::orderBy('created_at', 'desc')->get();
+
+    if ($orders->count() > 0) {
+        return response()->json([
+            'message' => 'Get order success',
+            'data' => OrderResource::collection($orders)
+        ], 200);
+    } else {
+        return response()->json(['message' => 'No record available'], 200);
     }
+}
 
     // method POST
     public function store(Request $request)
@@ -112,19 +113,19 @@ class OrderController extends Controller
             $totalPrice = $cartDetails->sum('total_price');
 
             // Validate amount against payment method limits
-            if ($totalPrice < $paymentMethod->minimum_amount) {
-                return response()->json([
-                    'message' => 'Amount is below minimum limit for this payment method',
-                    'minimum_amount' => $paymentMethod->minimum_amount
-                ], 400);
-            }
+            // if ($totalPrice < $paymentMethod->minimum_amount) {
+            //     return response()->json([
+            //         'message' => 'Amount is below minimum limit for this payment method',
+            //         'minimum_amount' => $paymentMethod->minimum_amount
+            //     ], 400);
+            // }
 
-            if ($paymentMethod->maximum_amount && $totalPrice > $paymentMethod->maximum_amount) {
-                return response()->json([
-                    'message' => 'Amount exceeds maximum limit for this payment method',
-                    'maximum_amount' => $paymentMethod->maximum_amount
-                ], 400);
-            }
+            // if ($paymentMethod->maximum_amount && $totalPrice > $paymentMethod->maximum_amount) {
+            //     return response()->json([
+            //         'message' => 'Amount exceeds maximum limit for this payment method',
+            //         'maximum_amount' => $paymentMethod->maximum_amount
+            //     ], 400);
+            // }
 
             $order = Order::create([
                 'order_id' => 'ORD' . uniqid(),
